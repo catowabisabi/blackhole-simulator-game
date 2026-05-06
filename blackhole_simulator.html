@@ -1,0 +1,556 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>黑洞模擬器 · Black Hole</title>
+<link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Noto+Sans+TC:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #00000f;
+  --surface: rgba(5,5,30,0.92);
+  --border: rgba(100,180,255,0.18);
+  --accent: #4af;
+  --accent2: #f4a;
+  --gold: #ffc844;
+  --text: #ddeeff;
+  --muted: rgba(180,210,255,0.45);
+  --r: 18px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+* { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+body {
+  background: var(--bg); color: var(--text);
+  font-family: 'Noto Sans TC', sans-serif;
+  overflow: hidden; height: 100dvh; width: 100dvw; user-select: none;
+}
+#canvas-wrap { position:fixed; inset:0; z-index:0; }
+
+/* TOP BAR */
+#topbar {
+  position:fixed; top:0; left:0; right:0; z-index:20;
+  padding:14px 20px 10px;
+  display:flex; align-items:center; justify-content:space-between;
+  background:linear-gradient(to bottom,rgba(0,0,15,0.9) 0%,transparent 100%);
+  pointer-events:none;
+}
+#topbar h1 {
+  font-family:'Orbitron',sans-serif;
+  font-size:clamp(13px,4vw,18px); font-weight:900; letter-spacing:0.12em;
+  background:linear-gradient(90deg,var(--accent),var(--accent2));
+  -webkit-background-clip:text; -webkit-text-fill-color:transparent;
+}
+#stats-chip {
+  font-size:11px; color:var(--muted);
+  background:rgba(0,0,30,0.7); border:1px solid var(--border);
+  border-radius:20px; padding:5px 12px; display:flex; gap:12px;
+}
+#stats-chip span { color:var(--accent); font-family:'Orbitron',sans-serif; font-size:11px; }
+
+/* BOTTOM TRAY */
+#tray {
+  position:fixed; bottom:0; left:0; right:0; z-index:20;
+  padding:16px 16px calc(16px + var(--safe-bottom));
+  background:linear-gradient(to top,rgba(0,0,20,0.97) 60%,transparent 100%);
+}
+#spawn-row { display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:12px; }
+.spawn-btn {
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  padding:12px 6px;
+  background:var(--surface); border:1px solid var(--border); border-radius:var(--r);
+  color:var(--text); font-family:'Noto Sans TC',sans-serif; font-size:11px;
+  cursor:pointer; transition:all 0.18s;
+  backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+  position:relative; overflow:hidden;
+}
+.spawn-btn::before {
+  content:''; position:absolute; inset:0;
+  background:linear-gradient(135deg,rgba(100,180,255,0.1),transparent);
+  opacity:0; transition:opacity 0.18s;
+}
+.spawn-btn:active::before { opacity:1; }
+.spawn-btn:active { transform:scale(0.95); border-color:var(--accent); }
+.spawn-btn .icon { font-size:22px; line-height:1; }
+.spawn-btn .zh { font-size:12px; font-weight:500; }
+.spawn-btn .en { font-size:9px; color:var(--muted); letter-spacing:0.05em; text-transform:uppercase; }
+
+#ctrl-row { display:flex; gap:10px; align-items:center; margin-bottom:12px; }
+#speed-wrap {
+  flex:1; background:var(--surface); border:1px solid var(--border);
+  border-radius:var(--r); padding:10px 14px; backdrop-filter:blur(12px);
+}
+#speed-label { display:flex; justify-content:space-between; font-size:10px; color:var(--muted); margin-bottom:6px; }
+#speed-label .val { font-family:'Orbitron',sans-serif; font-size:11px; color:var(--accent); }
+input[type=range] {
+  width:100%; height:4px; accent-color:var(--accent);
+  -webkit-appearance:none; appearance:none; background:transparent; cursor:pointer;
+}
+input[type=range]::-webkit-slider-runnable-track {
+  height:4px; border-radius:2px;
+  background:linear-gradient(90deg,var(--accent) var(--pct,50%),rgba(100,180,255,0.2) var(--pct,50%));
+}
+input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance:none; width:16px; height:16px;
+  border-radius:50%; background:var(--accent); margin-top:-6px;
+  box-shadow:0 0 8px var(--accent);
+}
+.icon-btn {
+  width:50px; height:50px; flex-shrink:0;
+  background:var(--surface); border:1px solid var(--border); border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:20px; cursor:pointer; backdrop-filter:blur(12px); transition:all 0.18s;
+}
+.icon-btn:active { transform:scale(0.92); border-color:var(--accent2); }
+
+#unlock-btn {
+  width:100%; display:flex; align-items:center; justify-content:space-between;
+  padding:13px 18px;
+  background:linear-gradient(135deg,rgba(255,200,68,0.12),rgba(255,100,150,0.1));
+  border:1px solid rgba(255,200,68,0.35); border-radius:var(--r);
+  cursor:pointer; transition:all 0.2s; backdrop-filter:blur(12px);
+}
+#unlock-btn:active { transform:scale(0.98); }
+#unlock-btn .left { display:flex; align-items:center; gap:10px; }
+#unlock-btn .gem { font-size:22px; }
+#unlock-btn .label-zh { font-size:13px; font-weight:500; color:var(--gold); }
+#unlock-btn .label-en { font-size:10px; color:rgba(255,200,68,0.6); letter-spacing:0.04em; }
+#unlock-btn .price-tag {
+  font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700; color:var(--gold);
+  background:rgba(255,200,68,0.15); border:1px solid rgba(255,200,68,0.3);
+  border-radius:8px; padding:4px 10px;
+}
+
+#color-row { display:none; gap:10px; align-items:center; margin-top:10px; }
+#color-row.visible { display:flex; }
+#color-row label { font-size:11px; color:var(--muted); flex-shrink:0; }
+#trailColor { width:44px; height:36px; border:none; border-radius:10px; cursor:pointer; padding:2px; background:transparent; }
+#randomColor {
+  flex:1; padding:9px;
+  background:var(--surface); border:1px solid var(--border); border-radius:12px;
+  color:var(--text); font-size:11px; cursor:pointer; font-family:'Noto Sans TC',sans-serif;
+}
+
+/* PAYMENT OVERLAY */
+#pay-overlay {
+  display:none; position:fixed; inset:0; z-index:50;
+  background:rgba(0,0,10,0.85);
+  backdrop-filter:blur(16px); -webkit-backdrop-filter:blur(16px);
+  align-items:flex-end; justify-content:center;
+}
+#pay-overlay.visible { display:flex; }
+#pay-sheet {
+  width:100%; max-width:480px;
+  background:linear-gradient(170deg,#080820,#050515);
+  border:1px solid rgba(100,180,255,0.2); border-bottom:none;
+  border-radius:28px 28px 0 0;
+  padding:0 0 calc(24px + var(--safe-bottom));
+  animation:slideUp 0.35s cubic-bezier(0.34,1.56,0.64,1);
+}
+@keyframes slideUp {
+  from{transform:translateY(100%);opacity:0;}
+  to{transform:translateY(0);opacity:1;}
+}
+#pay-handle {
+  width:40px; height:4px; background:rgba(100,180,255,0.3);
+  border-radius:2px; margin:14px auto 0;
+}
+#pay-header {
+  padding:20px 24px 0;
+  display:flex; justify-content:space-between; align-items:flex-start;
+}
+#pay-header .titles .zh { font-size:20px; font-weight:500; color:#fff; }
+#pay-header .titles .en { font-size:12px; color:var(--muted); margin-top:2px; letter-spacing:0.04em; }
+#pay-close {
+  width:32px; height:32px; border-radius:50%;
+  background:rgba(255,255,255,0.08); border:none; color:#fff; font-size:16px;
+  cursor:pointer; display:flex; align-items:center; justify-content:center;
+}
+#pay-features { margin:20px 24px; display:flex; flex-direction:column; gap:10px; }
+.feature-item {
+  display:flex; align-items:center; gap:12px;
+  padding:12px 14px;
+  background:rgba(255,255,255,0.04); border:1px solid rgba(100,180,255,0.12); border-radius:14px;
+}
+.feature-item .fi-icon { font-size:20px; width:28px; text-align:center; flex-shrink:0; }
+.feature-item .fi-text .zh { font-size:13px; font-weight:500; }
+.feature-item .fi-text .en { font-size:10px; color:var(--muted); margin-top:1px; }
+#pay-price-block {
+  margin:4px 24px 20px; padding:16px;
+  background:linear-gradient(135deg,rgba(255,200,68,0.1),rgba(255,80,140,0.08));
+  border:1px solid rgba(255,200,68,0.25); border-radius:16px;
+  display:flex; align-items:center; justify-content:space-between;
+}
+#pay-price-block .amount { font-family:'Orbitron',sans-serif; font-size:28px; font-weight:900; color:var(--gold); }
+#pay-price-block .once { font-size:11px; color:var(--muted); margin-top:2px; }
+#pay-price-block .once span { color:rgba(255,200,68,0.7); }
+#pay-methods { display:flex; gap:8px; }
+.pm { width:44px; height:28px; background:rgba(255,255,255,0.1); border-radius:6px; display:flex; align-items:center; justify-content:center; font-size:18px; }
+#pay-actions { padding:0 24px; display:flex; flex-direction:column; gap:10px; }
+#pay-confirm {
+  width:100%; padding:16px;
+  background:linear-gradient(135deg,#ffc844,#ff8c44);
+  border:none; border-radius:16px;
+  font-family:'Orbitron',sans-serif; font-size:14px; font-weight:700;
+  color:#1a0a00; cursor:pointer; letter-spacing:0.06em;
+  box-shadow:0 4px 24px rgba(255,200,68,0.35); transition:all 0.2s;
+}
+#pay-confirm:active { transform:scale(0.98); }
+#pay-cancel {
+  width:100%; padding:13px; background:transparent;
+  border:1px solid var(--border); border-radius:16px;
+  color:var(--muted); font-size:13px; cursor:pointer; font-family:'Noto Sans TC',sans-serif;
+}
+
+#hint {
+  position:fixed; bottom:calc(225px + var(--safe-bottom));
+  left:50%; transform:translateX(-50%);
+  font-size:10px; color:rgba(100,180,255,0.25);
+  pointer-events:none; white-space:nowrap; z-index:10; letter-spacing:0.06em;
+}
+#toast {
+  position:fixed; top:80px; left:50%; transform:translateX(-50%) translateY(-20px);
+  background:rgba(50,255,150,0.15); border:1px solid rgba(50,255,150,0.4);
+  border-radius:30px; padding:10px 20px; font-size:13px; color:#5f9;
+  opacity:0; transition:all 0.4s; z-index:60; pointer-events:none; white-space:nowrap;
+}
+#toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<div id="canvas-wrap"></div>
+
+<div id="topbar">
+  <h1>⬛ BLACK HOLE</h1>
+  <div id="stats-chip">
+    天體 <span id="bodyCount">3</span> &nbsp;·&nbsp; 質量 <span id="bhMass">12000</span>
+  </div>
+</div>
+
+<div id="hint">拖曳旋轉 · 捏合縮放 &nbsp;/&nbsp; Drag · Pinch to zoom</div>
+
+<div id="tray">
+  <div id="spawn-row">
+    <button class="spawn-btn" id="addPlanet">
+      <span class="icon">🪐</span><span class="zh">行星</span><span class="en">Planet</span>
+    </button>
+    <button class="spawn-btn" id="addStar">
+      <span class="icon">⭐</span><span class="zh">恆星</span><span class="en">Star</span>
+    </button>
+    <button class="spawn-btn" id="addComet">
+      <span class="icon">☄️</span><span class="zh">彗星</span><span class="en">Comet</span>
+    </button>
+  </div>
+  <div id="ctrl-row">
+    <div id="speed-wrap">
+      <div id="speed-label">
+        <span>模擬速度 Speed</span>
+        <span class="val" id="speedVal">1.0×</span>
+      </div>
+      <input type="range" id="speed" min="0.1" max="5" step="0.1" value="1">
+    </div>
+    <button class="icon-btn" id="clearBtn">🗑</button>
+  </div>
+  <button id="unlock-btn">
+    <div class="left">
+      <span class="gem">💎</span>
+      <div>
+        <div class="label-zh">解鎖自訂尾跡顏色</div>
+        <div class="label-en">Unlock Custom Trail Colors</div>
+      </div>
+    </div>
+    <div class="price-tag">NT$99</div>
+  </button>
+  <div id="color-row">
+    <label>尾跡色 Trail</label>
+    <input type="color" id="trailColor" value="#00ffff">
+    <button id="randomColor">🎲 隨機 Random</button>
+  </div>
+</div>
+
+<!-- PAYMENT SHEET -->
+<div id="pay-overlay">
+  <div id="pay-sheet">
+    <div id="pay-handle"></div>
+    <div id="pay-header">
+      <div class="titles">
+        <div class="zh">解鎖進階功能</div>
+        <div class="en">Unlock Premium Features</div>
+      </div>
+      <button id="pay-close">✕</button>
+    </div>
+    <div id="pay-features">
+      <div class="feature-item">
+        <span class="fi-icon">🎨</span>
+        <div class="fi-text">
+          <div class="zh">自訂每個天體尾跡顏色</div>
+          <div class="en">Custom trail color per celestial body</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <span class="fi-icon">🎲</span>
+        <div class="fi-text">
+          <div class="zh">隨機顏色一鍵套用</div>
+          <div class="en">One-tap random color randomizer</div>
+        </div>
+      </div>
+      <div class="feature-item">
+        <span class="fi-icon">♾️</span>
+        <div class="fi-text">
+          <div class="zh">永久解鎖，一次付款</div>
+          <div class="en">Permanent unlock · One-time payment</div>
+        </div>
+      </div>
+    </div>
+    <div id="pay-price-block">
+      <div>
+        <div class="amount">NT$99</div>
+        <div class="once">一次付款，終身使用<br><span>One-time · Lifetime access</span></div>
+      </div>
+      <div id="pay-methods">
+        <div class="pm">💳</div>
+        <div class="pm">📱</div>
+        <div class="pm">🏦</div>
+      </div>
+    </div>
+    <div id="pay-actions">
+      <button id="pay-confirm">立即解鎖 &nbsp;·&nbsp; UNLOCK NOW</button>
+      <button id="pay-cancel">稍後再說 · Maybe later</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast">✅ 解鎖成功！Trail colors unlocked!</div>
+
+<script type="importmap">
+{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.168.0/build/three.module.js"}}
+</script>
+<script type="module">
+import * as THREE from 'three';
+
+class OrbitCtrl {
+  constructor(cam,el){
+    this.cam=cam;this.dist=420;this.theta=0.6;this.phi=1.1;
+    this.target=new THREE.Vector3();this.drag=false;this.prev={x:0,y:0};
+    el.addEventListener('mousedown',e=>{this.drag=true;this.prev={x:e.clientX,y:e.clientY};e.preventDefault();});
+    window.addEventListener('mouseup',()=>this.drag=false);
+    window.addEventListener('mousemove',e=>{
+      if(!this.drag)return;
+      this.theta-=(e.clientX-this.prev.x)*0.006;
+      this.phi=Math.max(0.15,Math.min(Math.PI-0.15,this.phi-(e.clientY-this.prev.y)*0.006));
+      this.prev={x:e.clientX,y:e.clientY};this.update();
+    });
+    el.addEventListener('wheel',e=>{this.dist=Math.max(60,Math.min(1400,this.dist+e.deltaY*0.6));this.update();e.preventDefault();},{passive:false});
+    let ltd=0;
+    el.addEventListener('touchstart',e=>{
+      if(e.touches.length===1){this.drag=true;this.prev={x:e.touches[0].clientX,y:e.touches[0].clientY};}
+      if(e.touches.length===2)ltd=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+    },{passive:true});
+    el.addEventListener('touchend',()=>this.drag=false,{passive:true});
+    el.addEventListener('touchmove',e=>{
+      if(e.touches.length===1&&this.drag){
+        this.theta-=(e.touches[0].clientX-this.prev.x)*0.006;
+        this.phi=Math.max(0.15,Math.min(Math.PI-0.15,this.phi-(e.touches[0].clientY-this.prev.y)*0.006));
+        this.prev={x:e.touches[0].clientX,y:e.touches[0].clientY};this.update();
+      }
+      if(e.touches.length===2){
+        const d=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+        this.dist=Math.max(60,Math.min(1400,this.dist-(d-ltd)*1.5));ltd=d;this.update();
+      }
+    },{passive:true});
+    this.update();
+  }
+  update(){
+    const s=Math.sin(this.phi),c=Math.cos(this.phi);
+    this.cam.position.set(this.target.x+this.dist*s*Math.cos(this.theta),this.target.y+this.dist*c,this.target.z+this.dist*s*Math.sin(this.theta));
+    this.cam.lookAt(this.target);
+  }
+}
+
+const scene=new THREE.Scene();
+scene.fog=new THREE.FogExp2(0x000008,0.0005);
+const camera=new THREE.PerspectiveCamera(60,innerWidth/innerHeight,1,3000);
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+document.getElementById('canvas-wrap').appendChild(renderer.domElement);
+const controls=new OrbitCtrl(camera,renderer.domElement);
+
+// Star field
+const sg=new THREE.BufferGeometry(),sp=new Float32Array(6000);
+for(let i=0;i<6000;i++)sp[i]=(Math.random()-0.5)*3000;
+sg.setAttribute('position',new THREE.BufferAttribute(sp,3));
+scene.add(new THREE.Points(sg,new THREE.PointsMaterial({color:0xffffff,size:0.8,sizeAttenuation:true})));
+scene.add(new THREE.AmbientLight(0x111133,2));
+scene.add(new THREE.PointLight(0xff6699,3,600));
+
+// Black hole
+const BH={mass:12000,radius:22,pos:new THREE.Vector3()};
+scene.add(new THREE.Mesh(new THREE.SphereGeometry(BH.radius,64,64),new THREE.MeshBasicMaterial({color:0x000000})));
+for(let i=0;i<3;i++){
+  const ring=new THREE.Mesh(
+    new THREE.TorusGeometry(BH.radius*(1.3+i*0.5),1.5-i*0.3,8,80),
+    new THREE.MeshBasicMaterial({color:[0xff4488,0xff6622,0xffaa00][i],transparent:true,opacity:0.6-i*0.1,blending:THREE.AdditiveBlending})
+  );
+  ring.rotation.x=Math.PI/2+(i-1)*0.08;
+  ring._rs=0.008+i*0.004;ring._ring=true;scene.add(ring);
+}
+const diskMat=new THREE.ShaderMaterial({
+  uniforms:{time:{value:0}},
+  vertexShader:`varying vec2 vUv;void main(){vUv=uv;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+  fragmentShader:`uniform float time;varying vec2 vUv;void main(){vec2 p=vUv*2.-1.;float r=length(p);float a=atan(p.y,p.x);float b=sin(r*18.-time*3.+a*2.)*0.5+0.5;float f=smoothstep(0.,0.15,r)*smoothstep(1.,0.7,r);vec3 c=mix(vec3(1.,0.1,0.4),vec3(1.,0.5,0.1),b);gl_FragColor=vec4(c,f*0.8*b);}`,
+  side:THREE.DoubleSide,transparent:true,blending:THREE.AdditiveBlending,depthWrite:false
+});
+const diskMesh=new THREE.Mesh(new THREE.PlaneGeometry(BH.radius*12,BH.radius*12),diskMat);
+diskMesh.rotation.x=-Math.PI/2;
+scene.add(diskMesh);
+
+// Bodies
+let bodies=[],G=14,simSpeed=1;
+const TAIL=80;
+
+class Body{
+  constructor(x,y,z,vx,vy,vz,mass,radius,color,type='planet'){
+    this.mass=mass;this.radius=radius;this.type=type;
+    this.vel=new THREE.Vector3(vx,vy,vz);this.alive=true;
+    const geo=new THREE.SphereGeometry(radius,24,24);
+    let mat,pendingGlow=null;
+    if(type==='star'){
+      mat=new THREE.MeshBasicMaterial({color});
+      this.light=new THREE.PointLight(color,8,radius*40);scene.add(this.light);
+      const cv=document.createElement('canvas');cv.width=cv.height=128;
+      const ctx=cv.getContext('2d'),grd=ctx.createRadialGradient(64,64,0,64,64,64);
+      const hex='#'+(color&0xffffff).toString(16).padStart(6,'0');
+      grd.addColorStop(0,hex);grd.addColorStop(0.25,hex);grd.addColorStop(1,'rgba(0,0,0,0)');
+      ctx.fillStyle=grd;ctx.fillRect(0,0,128,128);
+      pendingGlow=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cv),blending:THREE.AdditiveBlending,transparent:true,opacity:0.9,depthWrite:false}));
+      pendingGlow.scale.set(radius*7,radius*7,1);
+    } else {
+      mat=new THREE.MeshPhongMaterial({color,emissive:new THREE.Color(color).multiplyScalar(0.35),shininess:60});
+    }
+    this.mesh=new THREE.Mesh(geo,mat);
+    this.mesh.position.set(x,y,z);scene.add(this.mesh);
+    if(pendingGlow){this.glow=pendingGlow;this.mesh.add(this.glow);}
+
+    this.tailColor=new THREE.Color().setHSL(Math.random(),1,0.6);
+    this.tailPts=[];
+    const tg=new THREE.BufferGeometry();
+    tg.setAttribute('position',new THREE.BufferAttribute(new Float32Array(TAIL*3),3).setUsage(THREE.DynamicDrawUsage));
+    tg.setAttribute('alpha',new THREE.BufferAttribute(new Float32Array(TAIL),1).setUsage(THREE.DynamicDrawUsage));
+    tg.setDrawRange(0,0);this.tailGeo=tg;
+    this.tailMat=new THREE.ShaderMaterial({
+      uniforms:{color:{value:this.tailColor}},
+      vertexShader:`attribute float alpha;varying float vA;void main(){vA=alpha;gl_PointSize=max(1.0,5.0*alpha);gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}`,
+      fragmentShader:`uniform vec3 color;varying float vA;void main(){float d=length(gl_PointCoord-vec2(0.5));if(d>0.5)discard;gl_FragColor=vec4(color,vA*(1.-d*2.));}`,
+      transparent:true,depthWrite:false,blending:THREE.AdditiveBlending
+    });
+    this.tailObj=new THREE.Points(tg,this.tailMat);scene.add(this.tailObj);
+  }
+  update(dt){
+    const diff=BH.pos.clone().sub(this.mesh.position);
+    this.vel.addScaledVector(diff.normalize(),G*BH.mass/Math.max(diff.lengthSq(),1)*dt);
+    for(const o of bodies){
+      if(o===this||!o.alive)continue;
+      const d2=o.mesh.position.clone().sub(this.mesh.position);
+      this.vel.addScaledVector(d2.normalize(),G*o.mass/Math.max(d2.lengthSq(),100)*dt);
+    }
+    this.mesh.position.addScaledVector(this.vel,dt);
+    if(this.light)this.light.position.copy(this.mesh.position);
+    this.tailPts.push(this.mesh.position.clone());
+    if(this.tailPts.length>TAIL)this.tailPts.shift();
+    const n=this.tailPts.length;
+    if(n>=2){
+      const pa=this.tailGeo.attributes.position.array,aa=this.tailGeo.attributes.alpha.array;
+      for(let j=0;j<n;j++){const p=this.tailPts[j];pa[j*3]=p.x;pa[j*3+1]=p.y;pa[j*3+2]=p.z;aa[j]=j/(n-1);}
+      this.tailGeo.attributes.position.needsUpdate=true;this.tailGeo.attributes.alpha.needsUpdate=true;
+      this.tailGeo.setDrawRange(0,n);
+    }
+  }
+  dispose(){
+    scene.remove(this.mesh);scene.remove(this.tailObj);
+    this.mesh.geometry.dispose();this.tailGeo.dispose();this.tailMat.dispose();
+    if(this.light)scene.remove(this.light);
+    if(this.glow){this.glow.material.map.dispose();this.glow.material.dispose();}
+  }
+}
+
+function orbV(x,y,z,ex=0){
+  const r=Math.sqrt(x*x+y*y+z*z),spd=Math.sqrt(G*BH.mass/r)*(0.85+Math.random()*0.3)+ex,a=Math.atan2(z,x);
+  return{vx:-Math.sin(a)*spd*(0.9+Math.random()*0.2),vy:(Math.random()-0.5)*spd*0.15,vz:Math.cos(a)*spd*(0.9+Math.random()*0.2)};
+}
+function spawnPlanet(){
+  const r=120+Math.random()*200,a=Math.random()*Math.PI*2,el=(Math.random()-0.5)*60;
+  const x=r*Math.cos(a)*Math.cos(el),y=r*Math.sin(el),z=r*Math.sin(a)*Math.cos(el),v=orbV(x,y,z);
+  bodies.push(new Body(x,y,z,v.vx,v.vy,v.vz,25+Math.random()*20,7+Math.random()*5,[0x44ff88,0x88aaff,0xff8844,0xaaffcc,0xff44aa][Math.floor(Math.random()*5)],'planet'));
+}
+function spawnStar(){
+  const r=200+Math.random()*180,a=Math.random()*Math.PI*2,el=(Math.random()-0.5)*40;
+  const x=r*Math.cos(a)*Math.cos(el),y=r*Math.sin(el),z=r*Math.sin(a)*Math.cos(el),v=orbV(x,y,z,2);
+  bodies.push(new Body(x,y,z,v.vx,v.vy,v.vz,80+Math.random()*60,12+Math.random()*7,[0xffffff,0xffeeaa,0xaaccff,0xffaa66][Math.floor(Math.random()*4)],'star'));
+}
+function spawnComet(){
+  const s=Math.random()<0.5?1:-1,x=s*350+Math.random()*80,y=(Math.random()-0.5)*100,z=(Math.random()-0.5)*350,v=orbV(x,y,z,5);
+  bodies.push(new Body(x,y,z,v.vx,v.vy,v.vz,8,4,0xaaddff,'comet'));
+}
+spawnPlanet();spawnPlanet();spawnStar();
+
+let t=0;
+function animate(){
+  requestAnimationFrame(animate);t+=0.016;
+  diskMat.uniforms.time.value=t;
+  scene.children.forEach(c=>{if(c._ring)c.rotation.y+=c._rs;});
+  const dt=0.35*simSpeed;
+  for(let i=bodies.length-1;i>=0;i--){
+    const b=bodies[i];b.update(dt);
+    if(b.mesh.position.distanceTo(BH.pos)<BH.radius+b.radius+6){
+      BH.mass+=b.mass*0.1;b.dispose();bodies.splice(i,1);
+      document.getElementById('bhMass').textContent=Math.round(BH.mass);
+    }
+  }
+  document.getElementById('bodyCount').textContent=bodies.length;
+  renderer.render(scene,camera);
+}
+animate();
+
+// UI
+document.getElementById('addPlanet').onclick=spawnPlanet;
+document.getElementById('addStar').onclick=spawnStar;
+document.getElementById('addComet').onclick=spawnComet;
+document.getElementById('clearBtn').onclick=()=>{bodies.forEach(b=>b.dispose());bodies=[];};
+const speedEl=document.getElementById('speed');
+speedEl.addEventListener('input',function(){
+  simSpeed=+this.value;
+  document.getElementById('speedVal').textContent=simSpeed.toFixed(1)+'×';
+  const pct=((this.value-0.1)/(5-0.1)*100)+'%';
+  this.style.setProperty('--pct',pct);
+});
+
+document.getElementById('unlock-btn').onclick=()=>document.getElementById('pay-overlay').classList.add('visible');
+document.getElementById('pay-close').onclick=()=>document.getElementById('pay-overlay').classList.remove('visible');
+document.getElementById('pay-cancel').onclick=()=>document.getElementById('pay-overlay').classList.remove('visible');
+document.getElementById('pay-overlay').addEventListener('click',e=>{if(e.target===document.getElementById('pay-overlay'))document.getElementById('pay-overlay').classList.remove('visible');});
+document.getElementById('pay-confirm').onclick=()=>{
+  document.getElementById('pay-overlay').classList.remove('visible');
+  document.getElementById('unlock-btn').style.display='none';
+  document.getElementById('color-row').classList.add('visible');
+  const toast=document.getElementById('toast');
+  toast.classList.add('show');
+  setTimeout(()=>toast.classList.remove('show'),3000);
+};
+
+document.getElementById('trailColor').oninput=e=>{
+  bodies.forEach(b=>b.tailMat.uniforms.color.value.set(e.target.value));
+};
+document.getElementById('randomColor').onclick=()=>{
+  const c='#'+Math.floor(Math.random()*0xffffff).toString(16).padStart(6,'0');
+  document.getElementById('trailColor').value=c;
+  bodies.forEach(b=>b.tailMat.uniforms.color.value.set(c));
+};
+window.addEventListener('resize',()=>{
+  camera.aspect=innerWidth/innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
