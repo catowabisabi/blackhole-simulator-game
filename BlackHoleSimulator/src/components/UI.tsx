@@ -21,6 +21,11 @@ interface UIProps {
   isUnlocked: boolean;
   trailColor: string;
   onTrailColorChange: (color: string) => void;
+  playerMass?: number;
+  playerAbsorbed?: number;
+  gameState?: 'idle' | 'playing' | 'won' | 'lost';
+  score?: number;
+  onRestart?: () => void;
 }
 
 export default function UI({
@@ -36,6 +41,11 @@ export default function UI({
   isUnlocked,
   trailColor,
   onTrailColorChange,
+  playerMass = 0,
+  playerAbsorbed = 0,
+  gameState = 'idle',
+  score = 0,
+  onRestart,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [localSpeed, setLocalSpeed] = useState(simSpeed);
@@ -56,7 +66,7 @@ export default function UI({
           <Text style={styles.title}>BLACK HOLE</Text>
           <View style={styles.statsChip}>
             <Text style={styles.statsText}>
-              天體 <Text style={styles.statValue}>{bodyCount}</Text> · 質量 <Text style={styles.statValue}>{bhMass}</Text>
+              玩家 <Text style={styles.statValue}>{playerAbsorbed}</Text> · 質量 <Text style={styles.statValue}>{bhMass}</Text>
             </Text>
           </View>
         </View>

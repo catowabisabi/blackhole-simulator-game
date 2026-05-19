@@ -1,5 +1,5 @@
 import { useEffect, useRef, useCallback } from 'react';
-import { View, StyleSheet, PanResponder, Dimensions, Platform } from 'react-native';
+import { View, StyleSheet, PanResponder, Dimensions, Platform, Keyboard, TextInput, Text } from 'react-native';
 import { GLView } from 'expo-gl';
 import * as THREE from 'three';
 
@@ -10,6 +10,23 @@ const BH_RADIUS = 22;
 const G = 14;
 const TAIL = 80;
 const BH_POS = new THREE.Vector3();
+
+// Player constants
+const PLAYER_INITIAL_MASS = 40;
+const PLAYER_INITIAL_RADIUS = 8;
+const PLAYER_SPEED = 180;
+const PLAYER_BOUNDS = 280;
+const PLAYER_HIT_RADIUS = 6;
+
+// Enemy black hole constants
+const ENEMY_BH_MASS = 15000;
+const ENEMY_BH_RADIUS = 18;
+const ENEMY_BH_SPEED = 60;
+
+// Win condition: absorb enough mass
+const WIN_MASS_THRESHOLD = 50000;
+// Lose condition: hit enemy BH when player is smaller
+const LOSE_MASS_RATIO = 1.2;
 
 interface BodyInterface {
   mesh: THREE.Mesh;
@@ -30,15 +47,46 @@ interface BodyInterface {
   setTrailColor: (color: THREE.Color) => void;
 }
 
+interface EnemyBHInterface {
+  mesh: THREE.Mesh;
+  ring: THREE.Mesh;
+  vel: THREE.Vector3;
+  mass: number;
+  radius: number;
+  alive: boolean;
+  update: (dt: number, playerPos: THREE.Vector3) => void;
+  dispose: (scene: THREE.Scene) => void;
+}
+
+interface PlayerInterface {
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  mass: number;
+  radius: number;
+  alive: boolean;
+  absorbedMass: number;
+  mesh?: THREE.Mesh;
+  glow?: THREE.Sprite;
+  update: (dt: number, keys: { [key: string]: boolean }, enemyBHs: EnemyBH[]) => void;
+  dispose: (scene: THREE.Scene) => void;
+  grow: (massGain: number) => void;
+}
+
 interface SceneState {
   bodyCount: number;
   bhMass: number;
+  playerMass: number;
+  playerAbsorbed: number;
+  gameState: 'idle' | 'playing' | 'won' | 'lost';
+  score: number;
 }
 
 interface SceneProps {
   simSpeed: number;
   trailColor: string | null;
   onStatsChange: (stats: SceneState) => void;
+  onGameStateChange: (state: 'idle' | 'playing' | 'won' | 'lost') => void;
+  onPlayerPosChange: (pos: { x: number; y: number }) => void;
 }
 
 class OrbitControls {
@@ -257,6 +305,160 @@ class Body implements BodyInterface {
   }
 }
 
+class EnemyBH implements EnemyBHInterface {
+  mesh: THREE.Mesh;
+  ring: THREE.Mesh;
+  vel: THREE.Vector3;
+  mass: number;
+  radius: number;
+  alive: boolean = true;
+
+  constructor(x: number, y: number, z: number, scene: THREE.Scene) {
+    this.mass = ENEMY_BH_MASS;
+    this.radius = ENEMY_BH_RADIUS;
+    const angle = Math.atan2(z, x);
+    this.vel = new THREE.Vector3(
+      -Math.sin(angle) * ENEMY_BH_SPEED,
+      0,
+      Math.cos(angle) * ENEMY_BH_SPEED
+    );
+
+    this.mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(this.radius, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0x220033 })
+    );
+    this.mesh.position.set(x, y, z);
+    scene.add(this.mesh);
+
+    this.ring = new THREE.Mesh(
+      new THREE.TorusGeometry(this.radius * 1.6, 1.0, 8, 60),
+      new THREE.MeshBasicMaterial({
+        color: 0xff00ff,
+        transparent: true,
+        opacity: 0.5,
+        blending: THREE.AdditiveBlending,
+      })
+    );
+    this.ring.rotation.x = Math.PI / 2;
+    this.mesh.add(this.ring);
+  }
+
+  update(dt: number, playerPos: THREE.Vector3) {
+    const toPlayer = playerPos.clone().sub(this.mesh.position);
+    toPlayer.y = 0;
+    const dist = toPlayer.length();
+    if (dist > 0.1) {
+      this.vel.addScaledVector(toPlayer.normalize(), 20 * dt);
+    }
+    const spd = this.vel.length();
+    if (spd > ENEMY_BH_SPEED * 2) {
+      this.vel.multiplyScalar((ENEMY_BH_SPEED * 2) / spd);
+    }
+    this.mesh.position.addScaledVector(this.vel, dt);
+    this.ring.rotation.y += 0.02;
+  }
+
+  dispose(scene: THREE.Scene) {
+    this.alive = false;
+    scene.remove(this.mesh);
+    scene.remove(this.ring);
+    this.mesh.geometry.dispose();
+    (this.mesh.material as THREE.Material).dispose();
+    this.ring.geometry.dispose();
+    (this.ring.material as THREE.Material).dispose();
+  }
+}
+
+class Player implements PlayerInterface {
+  pos: THREE.Vector3;
+  vel: THREE.Vector3;
+  mass: number;
+  radius: number;
+  alive: boolean = true;
+  absorbedMass: number = 0;
+  mesh?: THREE.Mesh;
+  glow?: THREE.Sprite;
+
+  constructor(x: number, y: number, z: number, scene: THREE.Scene) {
+    this.pos = new THREE.Vector3(x, y, z);
+    this.vel = new THREE.Vector3();
+    this.mass = PLAYER_INITIAL_MASS;
+    this.radius = PLAYER_INITIAL_RADIUS;
+
+    this.mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(this.radius, 32, 32),
+      new THREE.MeshBasicMaterial({ color: 0x00ffaa })
+    );
+    this.mesh.position.copy(this.pos);
+    scene.add(this.mesh);
+
+    const glowMat = new THREE.SpriteMaterial({
+      color: 0x00ffaa,
+      transparent: true,
+      opacity: 0.4,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.glow = new THREE.Sprite(glowMat);
+    this.glow.scale.set(this.radius * 5, this.radius * 5, 1);
+    this.mesh.add(this.glow);
+  }
+
+  update(dt: number, keys: { [key: string]: boolean }, enemyBHs: EnemyBH[]) {
+    if (!this.alive) return;
+    let dx = 0, dz = 0;
+    if (keys['ArrowLeft'] || keys['a']) dx -= 1;
+    if (keys['ArrowRight'] || keys['d']) dx += 1;
+    if (keys['ArrowUp'] || keys['w']) dz -= 1;
+    if (keys['ArrowDown'] || keys['s']) dz += 1;
+    if (dx !== 0 || dz !== 0) {
+      const len = Math.sqrt(dx * dx + dz * dz);
+      this.vel.x = (dx / len) * PLAYER_SPEED;
+      this.vel.z = (dz / len) * PLAYER_SPEED;
+    } else {
+      this.vel.x *= 0.85;
+      this.vel.z *= 0.85;
+    }
+    this.pos.x = Math.max(-PLAYER_BOUNDS, Math.min(PLAYER_BOUNDS, this.pos.x + this.vel.x * dt));
+    this.pos.z = Math.max(-PLAYER_BOUNDS, Math.min(PLAYER_BOUNDS, this.pos.z + this.vel.z * dt));
+    if (this.mesh) {
+      this.pos.y = 0;
+      this.mesh.position.copy(this.pos);
+    }
+    for (const ebh of enemyBHs) {
+      if (!ebh.alive) continue;
+      const d = this.pos.distanceTo(ebh.mesh.position);
+      if (d < this.radius + ebh.radius - PLAYER_HIT_RADIUS) {
+        if (this.mass >= ebh.mass * LOSE_MASS_RATIO) {
+          this.grow(ebh.mass * 0.3);
+          ebh.dispose(ebh.mesh.parent as THREE.Scene);
+        }
+      }
+    }
+  }
+
+  grow(massGain: number) {
+    this.mass += massGain;
+    this.absorbedMass += massGain;
+    this.radius = PLAYER_INITIAL_RADIUS * Math.cbrt(this.mass / PLAYER_INITIAL_MASS);
+    if (this.mesh) {
+      this.mesh.scale.setScalar(this.radius / PLAYER_INITIAL_RADIUS);
+    }
+  }
+
+  dispose(scene: THREE.Scene) {
+    this.alive = false;
+    if (this.mesh) {
+      scene.remove(this.mesh);
+      this.mesh.geometry.dispose();
+      (this.mesh.material as THREE.Material).dispose();
+    }
+    if (this.glow) {
+      (this.glow.material as THREE.SpriteMaterial).dispose();
+    }
+  }
+}
+
 function orbV(x: number, y: number, z: number, ex = 0) {
   const r = Math.sqrt(x * x + y * y + z * z);
   const spd = Math.sqrt(G * BH_MASS / r) * (0.85 + Math.random() * 0.3) + ex;
@@ -275,9 +477,9 @@ function createSceneObjects(gl: any) {
   const camera = new THREE.PerspectiveCamera(60, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 3000);
 
   const renderer = new THREE.WebGLRenderer({
-    gl: gl,
+    context: gl,
     antialias: true,
-  });
+  } as any);
   renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
   renderer.setPixelRatio(Math.min(Platform.OS === 'ios' ? 3 : 2, 2));
 
@@ -353,12 +555,18 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
   const bhMassRef = useRef(BH_MASS);
   const animationIdRef = useRef<number | null>(null);
+
+  const playerRef = useRef<Player | null>(null);
+  const enemyBHsRef = useRef<EnemyBH[]>([]);
+  const keysRef = useRef<{ [key: string]: boolean }>({});
+  const gameStateRef = useRef<'idle' | 'playing' | 'won' | 'lost'>('idle');
+  const scoreRef = useRef(0);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -367,6 +575,33 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
     controls: OrbitControls;
     diskMat: THREE.ShaderMaterial;
   } | null>(null);
+
+  useEffect(() => {
+    const subDown = Keyboard.addListener('keydown' as any, (e: any) => {
+      keysRef.current[e.key] = true;
+      if (gameStateRef.current === 'idle') {
+        gameStateRef.current = 'playing';
+        onGameStateChange('playing');
+      }
+    });
+    const subUp = Keyboard.addListener('keyup' as any, (e: any) => {
+      keysRef.current[e.key] = false;
+    });
+    return () => {
+      subDown.remove();
+      subUp.remove();
+    };
+  }, [onGameStateChange]);
+
+  const spawnEnemyBH = useCallback(() => {
+    if (!sceneObjectsRef.current) return;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 250 + Math.random() * 100;
+    const x = Math.cos(angle) * dist;
+    const z = Math.sin(angle) * dist;
+    const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene);
+    enemyBHsRef.current.push(ebh);
+  }, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -387,6 +622,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
   ).current;
 
   const lastPinchDistance = useRef<number | null>(null);
+  const touchStartRef = useRef<{ x: number; y: number } | null>(null);
+  const touchDeltaRef = useRef<{ dx: number; dy: number }>({ dx: 0, dy: 0 });
 
   const handleTouchMove = useCallback((evt: any) => {
     const touches = evt.nativeEvent.touches;
@@ -399,9 +636,35 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
         sceneObjectsRef.current?.controls.handleZoom(delta);
       }
       lastPinchDistance.current = dist;
+    } else if (touches.length === 1 && gameStateRef.current === 'playing') {
+      const tx = touches[0].pageX;
+      const ty = touches[0].pageY;
+      if (!touchStartRef.current) {
+        touchStartRef.current = { x: tx, y: ty };
+      }
+      touchDeltaRef.current = {
+        dx: tx - touchStartRef.current.x,
+        dy: ty - touchStartRef.current.y,
+      };
+      const maxDelta = 80;
+      const ddx = Math.max(-1, Math.min(1, touchDeltaRef.current.dx / maxDelta));
+      const ddy = Math.max(-1, Math.min(1, touchDeltaRef.current.dy / maxDelta));
+      keysRef.current['ArrowLeft'] = ddx < -0.3;
+      keysRef.current['ArrowRight'] = ddx > 0.3;
+      keysRef.current['ArrowUp'] = ddy < -0.3;
+      keysRef.current['ArrowDown'] = ddy > 0.3;
     } else {
       lastPinchDistance.current = null;
     }
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    lastPinchDistance.current = null;
+    touchStartRef.current = null;
+    keysRef.current['ArrowLeft'] = false;
+    keysRef.current['ArrowRight'] = false;
+    keysRef.current['ArrowUp'] = false;
+    keysRef.current['ArrowDown'] = false;
   }, []);
 
   const spawnFunctionsRef = useRef({
@@ -456,6 +719,29 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
       const threeColor = new THREE.Color(color);
       bodiesRef.current.forEach((b) => b.setTrailColor(threeColor));
     },
+    restartGame: () => {
+      if (!sceneObjectsRef.current) return;
+      const scene = sceneObjectsRef.current.scene;
+      bodiesRef.current.forEach((b) => b.dispose(scene));
+      bodiesRef.current = [];
+      enemyBHsRef.current.forEach((ebh) => ebh.dispose(scene));
+      enemyBHsRef.current = [];
+      if (playerRef.current) {
+        playerRef.current.dispose(scene);
+        playerRef.current = null;
+      }
+      bhMassRef.current = BH_MASS;
+      scoreRef.current = 0;
+      gameStateRef.current = 'idle';
+      onGameStateChange('idle');
+      keysRef.current = {};
+      const player = new Player(0, 0, 0, scene);
+      playerRef.current = player;
+      spawnEnemyBH();
+      spawnFunctionsRef.current.spawnPlanet();
+      spawnFunctionsRef.current.spawnPlanet();
+      spawnFunctionsRef.current.spawnStar();
+    },
   });
 
   useEffect(() => {
@@ -468,11 +754,16 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
     const { scene, camera, renderer, controls, diskMat } = createSceneObjects(gl);
     sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat };
 
+    const player = new Player(0, 0, 0, scene);
+    playerRef.current = player;
+
+    spawnEnemyBH();
     spawnFunctionsRef.current.spawnPlanet();
     spawnFunctionsRef.current.spawnPlanet();
     spawnFunctionsRef.current.spawnStar();
 
     let t = 0;
+    let enemySpawnTimer = 0;
 
     const animate = () => {
       t += 0.016;
@@ -484,20 +775,76 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
 
       const dt = 0.35 * simSpeed;
 
-      for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
-        const b = bodiesRef.current[i];
-        b.update(dt, BH_POS, bhMassRef.current, bodiesRef.current);
+      const p = playerRef.current;
+      if (p && p.alive && gameStateRef.current === 'playing') {
+        p.update(dt, keysRef.current, enemyBHsRef.current);
+        onPlayerPosChange({ x: p.pos.x, y: p.pos.z });
 
-        if (b.mesh.position.distanceTo(BH_POS) < BH_RADIUS + b.radius + 6) {
-          bhMassRef.current += b.mass * 0.1;
-          b.dispose(scene);
-          bodiesRef.current.splice(i, 1);
+        for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
+          const b = bodiesRef.current[i];
+          if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
+            p.grow(b.mass * 0.15);
+            scoreRef.current += Math.round(b.mass);
+            bhMassRef.current += b.mass * 0.05;
+            b.dispose(scene);
+            bodiesRef.current.splice(i, 1);
+            if (p.absorbedMass >= WIN_MASS_THRESHOLD) {
+              gameStateRef.current = 'won';
+              onGameStateChange('won');
+            }
+          }
+        }
+
+        for (let i = enemyBHsRef.current.length - 1; i >= 0; i--) {
+          const ebh = enemyBHsRef.current[i];
+          if (!ebh.alive) {
+            enemyBHsRef.current.splice(i, 1);
+            continue;
+          }
+          ebh.update(dt, p.pos);
+          const d = p.pos.distanceTo(ebh.mesh.position);
+          if (d < p.radius + ebh.radius - PLAYER_HIT_RADIUS) {
+            if (p.mass >= ebh.mass * LOSE_MASS_RATIO) {
+              p.grow(ebh.mass * 0.3);
+              scoreRef.current += 500;
+              ebh.dispose(scene);
+              enemyBHsRef.current.splice(i, 1);
+              if (p.absorbedMass >= WIN_MASS_THRESHOLD) {
+                gameStateRef.current = 'won';
+                onGameStateChange('won');
+              }
+            } else {
+              gameStateRef.current = 'lost';
+              onGameStateChange('lost');
+              p.alive = false;
+            }
+          }
+        }
+
+        for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
+          const b = bodiesRef.current[i];
+          b.update(dt, BH_POS, bhMassRef.current, bodiesRef.current);
+          if (b.mesh.position.distanceTo(BH_POS) < BH_RADIUS + b.radius + 6) {
+            bhMassRef.current += b.mass * 0.1;
+            b.dispose(scene);
+            bodiesRef.current.splice(i, 1);
+          }
+        }
+
+        enemySpawnTimer += dt;
+        if (enemySpawnTimer > 8 && enemyBHsRef.current.length < 3) {
+          spawnEnemyBH();
+          enemySpawnTimer = 0;
         }
       }
 
       onStatsChange({
         bodyCount: bodiesRef.current.length,
         bhMass: Math.round(bhMassRef.current),
+        playerMass: p ? Math.round(p.mass) : 0,
+        playerAbsorbed: p ? Math.round(p.absorbedMass) : 0,
+        gameState: gameStateRef.current,
+        score: scoreRef.current,
       });
 
       renderer.render(scene, camera);
@@ -513,7 +860,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
         cancelAnimationFrame(animationIdRef.current);
       }
     };
-  }, [simSpeed, onStatsChange]);
+  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, spawnEnemyBH]);
 
   useEffect(() => {
     if (trailColor) {
@@ -541,7 +888,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange }: SceneProp
         onContextCreate={onContextCreate}
         onTouchStart={handleTouchMove}
         onTouchMove={handleTouchMove}
-        onTouchEnd={() => { lastPinchDistance.current = null; }}
+        onTouchEnd={handleTouchEnd}
       />
     </View>
   );

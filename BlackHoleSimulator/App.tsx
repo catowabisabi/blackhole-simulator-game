@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
-import { View, StyleSheet, Alert } from 'react-native';
+import { View, StyleSheet, Alert, TouchableOpacity, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Scene, { getSpawnFunctions } from './src/components/Scene';
 import UI from './src/components/UI';
@@ -7,19 +7,46 @@ import UI from './src/components/UI';
 interface SceneState {
   bodyCount: number;
   bhMass: number;
+  playerMass: number;
+  playerAbsorbed: number;
+  gameState: 'idle' | 'playing' | 'won' | 'lost';
+  score: number;
 }
 
 export default function App() {
   const [bodyCount, setBodyCount] = useState(3);
   const [bhMass, setBhMass] = useState(12000);
+  const [playerMass, setPlayerMass] = useState(40);
+  const [playerAbsorbed, setPlayerAbsorbed] = useState(0);
   const [simSpeed, setSimSpeed] = useState(1);
   const [isUnlocked, setIsUnlocked] = useState(false);
   const [trailColor, setTrailColor] = useState('#00ffff');
   const [showToast, setShowToast] = useState(false);
+  const [gameState, setGameState] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
+  const [score, setScore] = useState(0);
 
   const handleStatsChange = useCallback((stats: SceneState) => {
     setBodyCount(stats.bodyCount);
     setBhMass(stats.bhMass);
+    setPlayerMass(stats.playerMass);
+    setPlayerAbsorbed(stats.playerAbsorbed);
+    setScore(stats.score);
+  }, []);
+
+  const handleGameStateChange = useCallback((state: 'idle' | 'playing' | 'won' | 'lost') => {
+    setGameState(state);
+  }, []);
+
+  const handlePlayerPosChange = useCallback((pos: { x: number; y: number }) => {
+  }, []);
+
+  const handleRestart = useCallback(() => {
+    const spawnFn = getSpawnFunctions();
+    if (spawnFn && spawnFn.restartGame) {
+      spawnFn.restartGame();
+    }
+    setGameState('idle');
+    setScore(0);
   }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
@@ -75,6 +102,8 @@ export default function App() {
         simSpeed={simSpeed}
         trailColor={isUnlocked ? trailColor : null}
         onStatsChange={handleStatsChange}
+        onGameStateChange={handleGameStateChange}
+        onPlayerPosChange={handlePlayerPosChange}
       />
       <UI
         bodyCount={bodyCount}
@@ -89,7 +118,43 @@ export default function App() {
         isUnlocked={isUnlocked}
         trailColor={trailColor}
         onTrailColorChange={handleTrailColorChange}
+        playerMass={playerMass}
+        playerAbsorbed={playerAbsorbed}
+        gameState={gameState}
+        score={score}
+        onRestart={handleRestart}
       />
+      {gameState !== 'idle' && (
+        <View style={styles.overlay}>
+          <View style={styles.overlayContent}>
+            {gameState === 'won' && (
+              <>
+                <Text style={styles.overlayTitle}>🎉 勝利！</Text>
+                <Text style={styles.overlaySubtitle}>你已成為超大質量黑洞</Text>
+                <Text style={styles.overlayScore}>最終質量 {playerMass}</Text>
+                <Text style={styles.overlayScore}>分數 {score}</Text>
+              </>
+            )}
+            {gameState === 'lost' && (
+              <>
+                <Text style={styles.overlayTitleLose}>💀 被吞噬了！</Text>
+                <Text style={styles.overlaySubtitle}>撞上了更大的黑洞</Text>
+                <Text style={styles.overlayScore}>最終質量 {playerMass}</Text>
+                <Text style={styles.overlayScore}>分數 {score}</Text>
+              </>
+            )}
+            <TouchableOpacity style={styles.restartBtn} onPress={handleRestart}>
+              <Text style={styles.restartBtnText}>再玩一次 / Play Again</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      )}
+      {gameState === 'idle' && (
+        <View style={styles.startHint}>
+          <Text style={styles.startHintText}>按任意鍵或滑動開始遊戲</Text>
+          <Text style={styles.startHintSub}>WASD / 方向鍵 / 滑動控制移動</Text>
+        </View>
+      )}
       {showToast && (
         <View style={styles.toastContainer}>
           <View style={styles.toast}>
@@ -144,5 +209,71 @@ const styles = StyleSheet.create({
     height: 16,
     borderRadius: 8,
     backgroundColor: '#5f9',
+  },
+  overlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,20,0.88)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 50,
+  },
+  overlayContent: {
+    alignItems: 'center',
+    padding: 40,
+  },
+  overlayTitle: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#5f9',
+    marginBottom: 10,
+  },
+  overlayTitleLose: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#f55',
+    marginBottom: 10,
+  },
+  overlaySubtitle: {
+    fontSize: 16,
+    color: 'rgba(180,210,255,0.7)',
+    marginBottom: 20,
+  },
+  overlayScore: {
+    fontSize: 18,
+    color: '#4af',
+    marginBottom: 8,
+  },
+  restartBtn: {
+    marginTop: 20,
+    paddingVertical: 14,
+    paddingHorizontal: 36,
+    backgroundColor: '#4af',
+    borderRadius: 20,
+  },
+  restartBtnText: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#000',
+  },
+  startHint: {
+    position: 'absolute',
+    top: '40%',
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 30,
+  },
+  startHintText: {
+    fontSize: 18,
+    color: 'rgba(180,210,255,0.5)',
+    marginBottom: 6,
+  },
+  startHintSub: {
+    fontSize: 12,
+    color: 'rgba(100,180,255,0.3)',
   },
 });
