@@ -28,6 +28,14 @@ const WIN_MASS_THRESHOLD = 50000;
 // Lose condition: hit enemy BH when player is smaller
 const LOSE_MASS_RATIO = 1.2;
 
+// Level system
+const LEVEL_THRESHOLDS = [0, 10000, 25000, 45000, 75000, 120000];
+const LEVEL_ENEMY_MASS = [0, 15000, 22000, 32000, 48000, 70000];
+const LEVEL_ENEMY_SPEED = [0, 55, 75, 100, 130, 170];
+const LEVEL_SPAWN_INTERVAL = [0, 10, 7, 5, 3.5, 2.5];
+const LEVEL_MAX_ENEMIES = [0, 2, 3, 4, 5, 6];
+const LEVEL_BODY_SPAWN_RATE = [0, 6, 4.5, 3, 2, 1.5];
+
 interface BodyInterface {
   mesh: THREE.Mesh;
   tailObj: THREE.Points;
@@ -79,6 +87,7 @@ interface SceneState {
   playerAbsorbed: number;
   gameState: 'idle' | 'playing' | 'won' | 'lost';
   score: number;
+  level: number;
 }
 
 interface SceneProps {
@@ -87,6 +96,7 @@ interface SceneProps {
   onStatsChange: (stats: SceneState) => void;
   onGameStateChange: (state: 'idle' | 'playing' | 'won' | 'lost') => void;
   onPlayerPosChange: (pos: { x: number; y: number }) => void;
+  onLevelChange: (level: number) => void;
 }
 
 class OrbitControls {
@@ -312,15 +322,17 @@ class EnemyBH implements EnemyBHInterface {
   mass: number;
   radius: number;
   alive: boolean = true;
+  maxSpeed: number;
 
-  constructor(x: number, y: number, z: number, scene: THREE.Scene) {
-    this.mass = ENEMY_BH_MASS;
-    this.radius = ENEMY_BH_RADIUS;
+  constructor(x: number, y: number, z: number, scene: THREE.Scene, mass: number, speed: number) {
+    this.mass = mass;
+    this.radius = 10 + mass / 1500;
+    this.maxSpeed = speed;
     const angle = Math.atan2(z, x);
     this.vel = new THREE.Vector3(
-      -Math.sin(angle) * ENEMY_BH_SPEED,
+      -Math.sin(angle) * speed,
       0,
-      Math.cos(angle) * ENEMY_BH_SPEED
+      Math.cos(angle) * speed
     );
 
     this.mesh = new THREE.Mesh(
@@ -351,8 +363,8 @@ class EnemyBH implements EnemyBHInterface {
       this.vel.addScaledVector(toPlayer.normalize(), 20 * dt);
     }
     const spd = this.vel.length();
-    if (spd > ENEMY_BH_SPEED * 2) {
-      this.vel.multiplyScalar((ENEMY_BH_SPEED * 2) / spd);
+    if (spd > this.maxSpeed * 2) {
+      this.vel.multiplyScalar((this.maxSpeed * 2) / spd);
     }
     this.mesh.position.addScaledVector(this.vel, dt);
     this.ring.rotation.y += 0.02;
@@ -555,7 +567,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -567,6 +579,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const keysRef = useRef<{ [key: string]: boolean }>({});
   const gameStateRef = useRef<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const scoreRef = useRef(0);
+  const levelRef = useRef(1);
+  const levelUpPendingRef = useRef(false);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -593,13 +607,13 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
     };
   }, [onGameStateChange]);
 
-  const spawnEnemyBH = useCallback(() => {
+  const spawnEnemyBH = useCallback((mass: number, speed: number) => {
     if (!sceneObjectsRef.current) return;
     const angle = Math.random() * Math.PI * 2;
     const dist = 250 + Math.random() * 100;
     const x = Math.cos(angle) * dist;
     const z = Math.sin(angle) * dist;
-    const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene);
+    const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene, mass, speed);
     enemyBHsRef.current.push(ebh);
   }, []);
 
@@ -732,12 +746,14 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
       }
       bhMassRef.current = BH_MASS;
       scoreRef.current = 0;
+      levelRef.current = 1;
+      levelUpPendingRef.current = false;
       gameStateRef.current = 'idle';
       onGameStateChange('idle');
       keysRef.current = {};
       const player = new Player(0, 0, 0, scene);
       playerRef.current = player;
-      spawnEnemyBH();
+      spawnEnemyBH(LEVEL_ENEMY_MASS[1], LEVEL_ENEMY_SPEED[1]);
       spawnFunctionsRef.current.spawnPlanet();
       spawnFunctionsRef.current.spawnPlanet();
       spawnFunctionsRef.current.spawnStar();
@@ -757,7 +773,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
     const player = new Player(0, 0, 0, scene);
     playerRef.current = player;
 
-    spawnEnemyBH();
+    spawnEnemyBH(LEVEL_ENEMY_MASS[1], LEVEL_ENEMY_SPEED[1]);
     spawnFunctionsRef.current.spawnPlanet();
     spawnFunctionsRef.current.spawnPlanet();
     spawnFunctionsRef.current.spawnStar();
@@ -774,6 +790,12 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
       });
 
       const dt = 0.35 * simSpeed;
+      const lvl = levelRef.current;
+      const spawnInterval = LEVEL_SPAWN_INTERVAL[lvl] || 2.5;
+      const maxEnemies = LEVEL_MAX_ENEMIES[lvl] || 6;
+      const enemyMass = LEVEL_ENEMY_MASS[lvl] || 70000;
+      const enemySpeed = LEVEL_ENEMY_SPEED[lvl] || 170;
+      const bodySpawnRate = LEVEL_BODY_SPAWN_RATE[lvl] || 1.5;
 
       const p = playerRef.current;
       if (p && p.alive && gameStateRef.current === 'playing') {
@@ -788,11 +810,25 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
             bhMassRef.current += b.mass * 0.05;
             b.dispose(scene);
             bodiesRef.current.splice(i, 1);
-            if (p.absorbedMass >= WIN_MASS_THRESHOLD) {
-              gameStateRef.current = 'won';
-              onGameStateChange('won');
-            }
           }
+        }
+
+        const absorbed = p.absorbedMass;
+        let newLevel = 1;
+        for (let l = LEVEL_THRESHOLDS.length - 1; l >= 1; l--) {
+          if (absorbed >= LEVEL_THRESHOLDS[l]) {
+            newLevel = l;
+            break;
+          }
+        }
+        if (newLevel > levelRef.current) {
+          levelRef.current = newLevel;
+          levelUpPendingRef.current = true;
+          onLevelChange(newLevel);
+        }
+        if (absorbed >= WIN_MASS_THRESHOLD) {
+          gameStateRef.current = 'won';
+          onGameStateChange('won');
         }
 
         for (let i = enemyBHsRef.current.length - 1; i >= 0; i--) {
@@ -809,10 +845,6 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
               scoreRef.current += 500;
               ebh.dispose(scene);
               enemyBHsRef.current.splice(i, 1);
-              if (p.absorbedMass >= WIN_MASS_THRESHOLD) {
-                gameStateRef.current = 'won';
-                onGameStateChange('won');
-              }
             } else {
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
@@ -821,19 +853,9 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
           }
         }
 
-        for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
-          const b = bodiesRef.current[i];
-          b.update(dt, BH_POS, bhMassRef.current, bodiesRef.current);
-          if (b.mesh.position.distanceTo(BH_POS) < BH_RADIUS + b.radius + 6) {
-            bhMassRef.current += b.mass * 0.1;
-            b.dispose(scene);
-            bodiesRef.current.splice(i, 1);
-          }
-        }
-
         enemySpawnTimer += dt;
-        if (enemySpawnTimer > 8 && enemyBHsRef.current.length < 3) {
-          spawnEnemyBH();
+        if (enemySpawnTimer > spawnInterval && enemyBHsRef.current.length < maxEnemies) {
+          spawnEnemyBH(enemyMass, enemySpeed);
           enemySpawnTimer = 0;
         }
       }
@@ -845,6 +867,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
         playerAbsorbed: p ? Math.round(p.absorbedMass) : 0,
         gameState: gameStateRef.current,
         score: scoreRef.current,
+        level: levelRef.current,
       });
 
       renderer.render(scene, camera);
@@ -860,7 +883,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
         cancelAnimationFrame(animationIdRef.current);
       }
     };
-  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, spawnEnemyBH]);
+  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, spawnEnemyBH]);
 
   useEffect(() => {
     if (trailColor) {

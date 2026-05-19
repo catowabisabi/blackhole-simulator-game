@@ -11,6 +11,7 @@ interface SceneState {
   playerAbsorbed: number;
   gameState: 'idle' | 'playing' | 'won' | 'lost';
   score: number;
+  level: number;
 }
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
   const [showToast, setShowToast] = useState(false);
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [score, setScore] = useState(0);
+  const [level, setLevel] = useState(1);
 
   const handleStatsChange = useCallback((stats: SceneState) => {
     setBodyCount(stats.bodyCount);
@@ -31,10 +33,15 @@ export default function App() {
     setPlayerMass(stats.playerMass);
     setPlayerAbsorbed(stats.playerAbsorbed);
     setScore(stats.score);
+    setLevel(stats.level);
   }, []);
 
   const handleGameStateChange = useCallback((state: 'idle' | 'playing' | 'won' | 'lost') => {
     setGameState(state);
+  }, []);
+
+  const handleLevelChange = useCallback((lvl: number) => {
+    setLevel(lvl);
   }, []);
 
   const handlePlayerPosChange = useCallback((pos: { x: number; y: number }) => {
@@ -47,6 +54,7 @@ export default function App() {
     }
     setGameState('idle');
     setScore(0);
+    setLevel(1);
   }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
@@ -104,6 +112,7 @@ export default function App() {
         onStatsChange={handleStatsChange}
         onGameStateChange={handleGameStateChange}
         onPlayerPosChange={handlePlayerPosChange}
+        onLevelChange={handleLevelChange}
       />
       <UI
         bodyCount={bodyCount}
@@ -153,6 +162,11 @@ export default function App() {
         <View style={styles.startHint}>
           <Text style={styles.startHintText}>按任意鍵或滑動開始遊戲</Text>
           <Text style={styles.startHintSub}>WASD / 方向鍵 / 滑動控制移動</Text>
+        </View>
+      )}
+      {gameState === 'playing' && level > 1 && (
+        <View style={styles.levelBadge}>
+          <Text style={styles.levelBadgeText}>LV.{level}</Text>
         </View>
       )}
       {showToast && (
@@ -275,5 +289,22 @@ const styles = StyleSheet.create({
   startHintSub: {
     fontSize: 12,
     color: 'rgba(100,180,255,0.3)',
+  },
+  levelBadge: {
+    position: 'absolute',
+    top: 90,
+    right: 20,
+    backgroundColor: 'rgba(255,100,0,0.2)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,150,0,0.5)',
+    borderRadius: 12,
+    paddingVertical: 5,
+    paddingHorizontal: 12,
+    zIndex: 20,
+  },
+  levelBadgeText: {
+    fontSize: 14,
+    fontWeight: '900',
+    color: '#ffa500',
   },
 });
