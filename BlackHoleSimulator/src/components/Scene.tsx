@@ -131,29 +131,15 @@ class Body implements BodyInterface {
       this.light = new THREE.PointLight(color, 8, radius * 40);
       scene.add(this.light);
 
-      const cv = { width: 128, height: 128 } as HTMLCanvasElement;
-      const ctx = cv.getContext('2d');
-      if (ctx) {
-        const grd = ctx.createRadialGradient(64, 64, 0, 64, 64, 64);
-        const hex = '#' + (color & 0xffffff).toString(16).padStart(6, '0');
-        grd.addColorStop(0, hex);
-        grd.addColorStop(0.25, hex);
-        grd.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = grd;
-        ctx.fillRect(0, 0, 128, 128);
-
-        const canvasTexture = new THREE.CanvasTexture(cv);
-        glowSprite = new THREE.Sprite(
-          new THREE.SpriteMaterial({
-            map: canvasTexture,
-            blending: THREE.AdditiveBlending,
-            transparent: true,
-            opacity: 0.9,
-            depthWrite: false,
-          })
-        );
-        glowSprite.scale.set(radius * 7, radius * 7, 1);
-      }
+      const glowMat = new THREE.SpriteMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.6,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      glowSprite = new THREE.Sprite(glowMat);
+      glowSprite.scale.set(radius * 7, radius * 7, 1);
     } else {
       mat = new THREE.MeshPhongMaterial({
         color,
@@ -288,8 +274,11 @@ function createSceneObjects(gl: any) {
 
   const camera = new THREE.PerspectiveCamera(60, SCREEN_WIDTH / SCREEN_HEIGHT, 1, 3000);
 
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(SCREEN_WIDTH, SCREEN_HEIGHT);
+  const renderer = new THREE.WebGLRenderer({
+    gl: gl,
+    antialias: true,
+  });
+  renderer.setSize(gl.drawingBufferWidth, gl.drawingBufferHeight);
   renderer.setPixelRatio(Math.min(Platform.OS === 'ios' ? 3 : 2, 2));
 
   const controls = new OrbitControls(camera);
