@@ -26,6 +26,9 @@ interface UIProps {
   gameState?: 'idle' | 'playing' | 'won' | 'lost';
   score?: number;
   onRestart?: () => void;
+  highScore?: number;
+  gamesPlayed?: number;
+  onShowStats?: () => void;
 }
 
 export default function UI({
@@ -46,6 +49,9 @@ export default function UI({
   gameState = 'idle',
   score = 0,
   onRestart,
+  highScore = 0,
+  gamesPlayed = 0,
+  onShowStats,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [localSpeed, setLocalSpeed] = useState(simSpeed);
@@ -64,10 +70,16 @@ export default function UI({
     <>
 <View style={styles.topBar}>
           <Text style={styles.title}>BLACK HOLE</Text>
-          <View style={styles.statsChip}>
-            <Text style={styles.statsText}>
-              玩家 <Text style={styles.statValue}>{playerAbsorbed}</Text> · 質量 <Text style={styles.statValue}>{bhMass}</Text>
-            </Text>
+          <View style={styles.topRightRow}>
+            <TouchableOpacity style={styles.scoreChip} onPress={onShowStats}>
+              <Text style={styles.scoreChipLabel}>分</Text>
+              <Text style={styles.scoreValue}>{score}</Text>
+            </TouchableOpacity>
+            <View style={styles.statsChip}>
+              <Text style={styles.statsText}>
+                玩家 <Text style={styles.statValue}>{playerAbsorbed}</Text> · 質量 <Text style={styles.statValue}>{bhMass}</Text>
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -243,6 +255,30 @@ export default function UI({
                 <Text style={styles.payCancelText}>稍後再說 · Maybe later</Text>
               </TouchableOpacity>
             </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
+      <Modal
+        visible={false}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => {}}
+      >
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1}>
+          <View style={styles.highScoreSheet}>
+            <Text style={styles.highScoreTitle}>📊 統計 / Statistics</Text>
+            <View style={styles.highScoreRow}>
+              <Text style={styles.highScoreLabel}>最高分 High Score</Text>
+              <Text style={styles.highScoreNum}>{highScore}</Text>
+            </View>
+            <View style={styles.highScoreRow}>
+              <Text style={styles.highScoreLabel}>遊戲次數 Games</Text>
+              <Text style={styles.highScoreNum}>{gamesPlayed}</Text>
+            </View>
+            <TouchableOpacity style={styles.hsCloseBtn} onPress={() => {}}>
+              <Text style={styles.hsCloseText}>關閉 / Close</Text>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
@@ -663,5 +699,76 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     fontSize: 13,
     color: '#5f9',
+  },
+  topRightRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  scoreChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,30,0.7)',
+    borderWidth: 1,
+    borderColor: 'rgba(100,180,255,0.18)',
+    borderRadius: 20,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
+    gap: 4,
+  },
+  scoreChipLabel: {
+    fontSize: 10,
+    color: 'rgba(180,210,255,0.45)',
+  },
+  scoreValue: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    color: '#5f9',
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  highScoreSheet: {
+    backgroundColor: '#080820',
+    borderWidth: 1,
+    borderColor: 'rgba(100,180,255,0.2)',
+    borderRadius: 24,
+    padding: 24,
+    width: '85%',
+    alignSelf: 'center',
+  },
+  highScoreTitle: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: '#4af',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  highScoreRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(100,180,255,0.1)',
+  },
+  highScoreLabel: {
+    fontSize: 14,
+    color: 'rgba(180,210,255,0.7)',
+  },
+  highScoreNum: {
+    fontFamily: Platform.OS === 'ios' ? 'System' : 'Roboto',
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#5f9',
+  },
+  hsCloseBtn: {
+    marginTop: 16,
+    padding: 12,
+    backgroundColor: 'rgba(100,180,255,0.1)',
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  hsCloseText: {
+    fontSize: 13,
+    color: 'rgba(180,210,255,0.6)',
   },
 });

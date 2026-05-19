@@ -3,6 +3,8 @@ import { View, StyleSheet, Alert, TouchableOpacity, Text } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import Scene, { getSpawnFunctions } from './src/components/Scene';
 import UI from './src/components/UI';
+import { AudioManager } from './src/systems/AudioManager';
+import { SaveManager } from './src/systems/SaveManager';
 
 interface SceneState {
   bodyCount: number;
@@ -26,6 +28,20 @@ export default function App() {
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
+  const [highScore, setHighScore] = useState(0);
+  const [gamesPlayed, setGamesPlayed] = useState(0);
+  const [showHighScoreModal, setShowHighScoreModal] = useState(false);
+
+  useEffect(() => {
+    AudioManager.init();
+    SaveManager.load().then((data) => {
+      setHighScore(data.highScore);
+      setGamesPlayed(data.gamesPlayed);
+    });
+    return () => {
+      AudioManager.cleanup();
+    };
+  }, []);
 
   const handleStatsChange = useCallback((stats: SceneState) => {
     setBodyCount(stats.bodyCount);
@@ -36,9 +52,21 @@ export default function App() {
     setLevel(stats.level);
   }, []);
 
-  const handleGameStateChange = useCallback((state: 'idle' | 'playing' | 'won' | 'lost') => {
+  const handleGameStateChange = useCallback(async (state: 'idle' | 'playing' | 'won' | 'lost') => {
     setGameState(state);
-  }, []);
+    if (state === 'won' || state === 'lost') {
+      const currentScore = score;
+      const currentLevel = level;
+      await SaveManager.updateScore(currentScore, currentLevel);
+      setHighScore(SaveManager.getData().highScore);
+      setGamesPlayed(SaveManager.getData().gamesPlayed);
+      if (state === 'won') {
+        await AudioManager.playSFX('win');
+      } else {
+        await AudioManager.playSFX('death');
+      }
+    }
+  }, [score, level]);
 
   const handleLevelChange = useCallback((lvl: number) => {
     setLevel(lvl);
@@ -132,6 +160,15 @@ export default function App() {
         gameState={gameState}
         score={score}
         onRestart={handleRestart}
+        highScore={highScore}
+        gamesPlayed={gamesPlayed}
+        onShowStats={() => {
+          Alert.alert(
+            '📊 統計 / Statistics',
+            `最高分 High Score: ${highScore}\n遊戲次數 Games: ${gamesPlayed}\n最高關卡 Best Level: ${SaveManager.getData().bestLevel}`,
+            [{ text: '關閉 / Close' }]
+          );
+        }}
       />
       {gameState !== 'idle' && (
         <View style={styles.overlay}>
