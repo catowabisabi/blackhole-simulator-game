@@ -400,6 +400,7 @@ class Player implements PlayerInterface {
   radius: number;
   alive: boolean = true;
   absorbedMass: number = 0;
+  growthFlash: number = 0;
   mesh?: THREE.Mesh;
   glow?: THREE.Sprite;
 
@@ -469,6 +470,7 @@ class Player implements PlayerInterface {
       this.mesh.scale.setScalar(this.radius / PLAYER_INITIAL_RADIUS);
     }
     SaveManager.addAbsorbedMass(massGain);
+    this.growthFlash = 1.0;
   }
 
   dispose(scene: THREE.Scene) {
@@ -546,7 +548,7 @@ function createSceneObjects(gl: any) {
   }
 
   const diskMat = new THREE.ShaderMaterial({
-    uniforms: { time: { value: 0 } },
+    uniforms: { time: { value: 0 }, growthFlash: { value: 0.0 } },
     vertexShader: `
       varying vec2 vUv;
       void main() {
@@ -556,6 +558,7 @@ function createSceneObjects(gl: any) {
     `,
     fragmentShader: `
       uniform float time;
+      uniform float growthFlash;
       varying vec2 vUv;
       void main() {
         vec2 p = vUv * 2.0 - 1.0;
@@ -564,7 +567,8 @@ function createSceneObjects(gl: any) {
         float b = sin(r * 18.0 - time * 3.0 + a * 2.0) * 0.5 + 0.5;
         float f = smoothstep(0.0, 0.15, r) * smoothstep(1.0, 0.7, r);
         vec3 c = mix(vec3(1.0, 0.1, 0.4), vec3(1.0, 0.5, 0.1), b);
-        gl_FragColor = vec4(c, f * 0.8 * b);
+        vec3 finalColor = mix(c, vec3(1.0, 0.85, 0.5), growthFlash * 0.7) * (1.0 + growthFlash * 0.8);
+        gl_FragColor = vec4(finalColor, f * 0.8 * b * (1.0 + growthFlash * 0.5));
       }
     `,
     side: THREE.DoubleSide,
@@ -865,6 +869,10 @@ const spawnEnemyBH = useCallback((mass: number, speed: number) => {
     const animate = () => {
       t += 0.016;
       diskMat.uniforms.time.value = t;
+      if (playerRef.current) {
+        diskMat.uniforms.growthFlash.value = playerRef.current.growthFlash;
+        playerRef.current.growthFlash = Math.max(0, playerRef.current.growthFlash - 0.03);
+      }
 
       scene.children.forEach((c: any) => {
         if (c._ring) c.rotation.y += c._rs;
