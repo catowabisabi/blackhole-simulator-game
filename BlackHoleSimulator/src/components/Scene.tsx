@@ -119,6 +119,10 @@ interface SceneProps {
   onLevelChange: (level: number) => void;
   onZoomLevelChange: (zoomLevel: number) => void;
   onOverlayOpacityChange: (opacity: number, type: 'win' | 'loss' | null) => void;
+  onFirstAbsorb?: () => void;
+  onFirstEnemyEncounter?: () => void;
+  onFirstLevelUp?: () => void;
+  onFirstDeath?: () => void;
   difficulty?: 'easy' | 'normal' | 'hard';
 }
 
@@ -595,7 +599,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, difficulty = 'normal' }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, difficulty = 'normal' }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -611,6 +615,10 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const objectsAbsorbedCountRef = useRef(0);
   const enemyBHKilledRef = useRef(0);
   const levelUpPendingRef = useRef(false);
+  const hintFirstAbsorbRef = useRef(false);
+  const hintFirstEnemyRef = useRef(false);
+  const hintFirstLevelUpRef = useRef(false);
+  const hintFirstDeathRef = useRef(false);
   const spawnWarningsRef = useRef<SpawnWarning[]>([]);
   const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: 420, duration: 2.5, elapsed: 0, type: 'win' });
 
@@ -914,6 +922,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
             AudioManager.playSFX('absorb');
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+            if (objectsAbsorbedCountRef.current === 0 && onFirstAbsorb && !hintFirstAbsorbRef.current) {
+              hintFirstAbsorbRef.current = true;
+              onFirstAbsorb();
+            }
             p.grow(b.mass * 0.15);
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * 0.05;
@@ -934,6 +946,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         if (newLevel > levelRef.current) {
           AudioManager.playSFX('levelup');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          if (onFirstLevelUp && !hintFirstLevelUpRef.current) {
+            hintFirstLevelUpRef.current = true;
+            onFirstLevelUp();
+          }
           levelRef.current = newLevel;
           levelUpPendingRef.current = true;
           onLevelChange(newLevel);
@@ -957,6 +973,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
           const d = p.pos.distanceTo(ebh.mesh.position);
           if (d < p.radius + ebh.radius - PLAYER_HIT_RADIUS) {
             if (p.mass >= ebh.mass * LOSE_MASS_RATIO) {
+              if (onFirstEnemyEncounter && !hintFirstEnemyRef.current) {
+                hintFirstEnemyRef.current = true;
+                onFirstEnemyEncounter();
+              }
               AudioManager.playSFX('kill');
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               p.grow(ebh.mass * 0.3);
@@ -968,6 +988,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               AudioManager.playSFX('death');
               Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               AudioManager.stopBGM();
+              if (onFirstDeath && !hintFirstDeathRef.current) {
+                hintFirstDeathRef.current = true;
+                onFirstDeath();
+              }
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
               cameraAnimationRef.current = { active: true, targetDist: 60, duration: 2.0, elapsed: 0, type: 'loss' };

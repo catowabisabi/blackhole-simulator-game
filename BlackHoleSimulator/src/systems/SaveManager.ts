@@ -6,6 +6,7 @@ interface SavedData {
   bestLevel: number;
   totalMassAbsorbed: number;
   difficulty: string;
+  shownHints: string[];
 }
 
 const SAVE_KEY = '@blackhole_save';
@@ -16,6 +17,7 @@ const defaultData: SavedData = {
   bestLevel: 1,
   totalMassAbsorbed: 0,
   difficulty: 'normal',
+  shownHints: [],
 };
 
 class SaveManagerClass {
@@ -68,6 +70,17 @@ class SaveManagerClass {
 
   getData(): SavedData {
     return this.data;
+  }
+
+  hasShownHint(hintId: string): boolean {
+    return this.data.shownHints.includes(hintId);
+  }
+
+  async markHintShown(hintId: string): Promise<void> {
+    if (!this.data.shownHints.includes(hintId)) {
+      this.data.shownHints.push(hintId);
+      await this.save();
+    }
   }
 }
 

@@ -32,6 +32,8 @@ interface UIProps {
   difficulty?: 'easy' | 'normal' | 'hard';
   onDifficultyChange?: (difficulty: 'easy' | 'normal' | 'hard') => void;
   zoomLevel?: number;
+  hintText?: string;
+  showHint?: boolean;
 }
 
 export default function UI({
@@ -58,6 +60,8 @@ export default function UI({
   difficulty = 'normal',
   onDifficultyChange,
   zoomLevel = 0.5,
+  hintText = '',
+  showHint = false,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -324,6 +328,12 @@ export default function UI({
       <View style={styles.toast}>
         <Text style={styles.toastText}>✅ 解鎖成功！Trail colors unlocked!</Text>
       </View>
+
+      {showHint && hintText && (
+        <View style={styles.hintToast}>
+          <Text style={styles.hintToastText}>{hintText}</Text>
+        </View>
+      )}
     </>
   );
 }
@@ -860,5 +870,23 @@ const styles = StyleSheet.create({
   },
   vignetteMax: {
     backgroundColor: 'rgba(50,100,150,0.15)',
+  },
+  hintToast: {
+    position: 'absolute',
+    bottom: 100,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 60,
+  },
+  hintToastText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: 'rgba(180,210,255,0.7)',
+    textAlign: 'center',
+    backgroundColor: 'rgba(0,0,20,0.8)',
+    borderRadius: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
   },
 });

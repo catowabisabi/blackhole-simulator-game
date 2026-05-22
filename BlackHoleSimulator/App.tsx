@@ -39,6 +39,8 @@ export default function App() {
   const [zoomLevel, setZoomLevel] = useState(0.5);
   const [overlayOpacity, setOverlayOpacity] = useState(0);
   const [overlayType, setOverlayType] = useState<'win' | 'loss' | null>(null);
+  const [hintText, setHintText] = useState('');
+  const [showHint, setShowHint] = useState(false);
 
   useEffect(() => {
     AudioManager.init();
@@ -162,6 +164,38 @@ export default function App() {
     }
   }, []);
 
+  const handleFirstAbsorb = useCallback(() => {
+    if (SaveManager.hasShownHint('first_absorb')) return;
+    SaveManager.markHintShown('first_absorb');
+    setHintText('吸收物體壯大自己 / Absorb objects to grow larger');
+    setShowHint(true);
+    setTimeout(() => setShowHint(false), 3000);
+  }, []);
+
+  const handleFirstEnemyEncounter = useCallback(() => {
+    if (SaveManager.hasShownHint('first_enemy')) return;
+    SaveManager.markHintShown('first_enemy');
+    setHintText('小心敵方黑洞 / Beware enemy black holes');
+    setShowHint(true);
+    setTimeout(() => setShowHint(false), 3000);
+  }, []);
+
+  const handleFirstLevelUp = useCallback(() => {
+    if (SaveManager.hasShownHint('first_levelup')) return;
+    SaveManager.markHintShown('first_levelup');
+    setHintText('升級了！變得更強 / Level up! Become stronger');
+    setShowHint(true);
+    setTimeout(() => setShowHint(false), 3000);
+  }, []);
+
+  const handleFirstDeath = useCallback(() => {
+    if (SaveManager.hasShownHint('first_death')) return;
+    SaveManager.markHintShown('first_death');
+    setHintText('被黑洞吞噬了 / Consumed by a black hole');
+    setShowHint(true);
+    setTimeout(() => setShowHint(false), 3000);
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar style="light" />
@@ -174,6 +208,10 @@ export default function App() {
         onLevelChange={handleLevelChange}
         onZoomLevelChange={handleZoomLevelChange}
         onOverlayOpacityChange={handleOverlayOpacityChange}
+        onFirstAbsorb={handleFirstAbsorb}
+        onFirstEnemyEncounter={handleFirstEnemyEncounter}
+        onFirstLevelUp={handleFirstLevelUp}
+        onFirstDeath={handleFirstDeath}
         difficulty={difficulty}
       />
       <UI
@@ -206,6 +244,8 @@ export default function App() {
         difficulty={difficulty}
         onDifficultyChange={handleDifficultyChange}
         zoomLevel={zoomLevel}
+        hintText={hintText}
+        showHint={showHint}
       />
       {gameState !== 'idle' && (
         <View style={[styles.overlay, { 
