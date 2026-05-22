@@ -32,6 +32,7 @@ export default function App() {
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [showHighScoreModal, setShowHighScoreModal] = useState(false);
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
+  const [zoomLevel, setZoomLevel] = useState(0.5);
 
   useEffect(() => {
     AudioManager.init();
@@ -74,6 +75,10 @@ export default function App() {
 
   const handleLevelChange = useCallback((lvl: number) => {
     setLevel(lvl);
+  }, []);
+
+  const handleZoomLevelChange = useCallback((zl: number) => {
+    setZoomLevel(zl);
   }, []);
 
   const handlePlayerPosChange = useCallback((pos: { x: number; y: number }) => {
@@ -150,6 +155,7 @@ export default function App() {
         onGameStateChange={handleGameStateChange}
         onPlayerPosChange={handlePlayerPosChange}
         onLevelChange={handleLevelChange}
+        onZoomLevelChange={handleZoomLevelChange}
         difficulty={difficulty}
       />
       <UI
@@ -181,6 +187,7 @@ export default function App() {
         }}
         difficulty={difficulty}
         onDifficultyChange={handleDifficultyChange}
+        zoomLevel={zoomLevel}
       />
       {gameState !== 'idle' && (
         <View style={styles.overlay}>

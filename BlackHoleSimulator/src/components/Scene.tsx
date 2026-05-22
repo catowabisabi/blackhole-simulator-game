@@ -107,6 +107,7 @@ interface SceneProps {
   onGameStateChange: (state: 'idle' | 'playing' | 'won' | 'lost') => void;
   onPlayerPosChange: (pos: { x: number; y: number }) => void;
   onLevelChange: (level: number) => void;
+  onZoomLevelChange: (zoomLevel: number) => void;
   difficulty?: 'easy' | 'normal' | 'hard';
 }
 
@@ -579,7 +580,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, difficulty = 'normal' }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, difficulty = 'normal' }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -898,6 +899,12 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         level: levelRef.current,
       });
 
+      // Report zoom level to UI (0 = min zoom in, 1 = max zoom out)
+      if (sceneObjectsRef.current) {
+        const zoomLevel = (sceneObjectsRef.current.controls.dist - 60) / 1340;
+        onZoomLevelChange(Math.max(0, Math.min(1, zoomLevel)));
+      }
+
       renderer.render(scene, camera);
       gl.endFrame();
 
@@ -911,7 +918,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         cancelAnimationFrame(animationIdRef.current);
       }
     };
-  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, spawnEnemyBH]);
+  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, spawnEnemyBH]);
 
   useEffect(() => {
     if (trailColor) {

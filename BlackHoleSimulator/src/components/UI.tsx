@@ -31,6 +31,7 @@ interface UIProps {
   onShowStats?: () => void;
   difficulty?: 'easy' | 'normal' | 'hard';
   onDifficultyChange?: (difficulty: 'easy' | 'normal' | 'hard') => void;
+  zoomLevel?: number;
 }
 
 export default function UI({
@@ -56,6 +57,7 @@ export default function UI({
   onShowStats,
   difficulty = 'normal',
   onDifficultyChange,
+  zoomLevel = 0.5,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -110,7 +112,18 @@ export default function UI({
           </TouchableOpacity>
         </View>
         <Text style={styles.hintText}>拖曳旋轉 · 捏合縮放 / Drag · Pinch to zoom</Text>
+        <View style={styles.zoomIndicator}>
+          <Text style={styles.zoomText}>🔍 {Math.round(zoomLevel * 100)}%</Text>
+        </View>
       </View>
+
+      {/* Vignette overlay when at zoom limits */}
+      {zoomLevel < 0.05 && (
+        <View style={[styles.vignette, styles.vignetteMin]} pointerEvents="none" />
+      )}
+      {zoomLevel > 0.95 && (
+        <View style={[styles.vignette, styles.vignetteMax]} pointerEvents="none" />
+      )}
 
       <View style={styles.bottomTray}>
           <View style={styles.spawnRow}>
@@ -822,5 +835,30 @@ const styles = StyleSheet.create({
   diffBtnTextActive: {
     color: '#4af',
     fontWeight: '700',
+  },
+  zoomIndicator: {
+    marginTop: 8,
+    backgroundColor: 'rgba(5,5,30,0.7)',
+    borderRadius: 12,
+    paddingVertical: 4,
+    paddingHorizontal: 10,
+  },
+  zoomText: {
+    fontSize: 10,
+    color: 'rgba(180,210,255,0.6)',
+  },
+  vignette: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 5,
+  },
+  vignetteMin: {
+    backgroundColor: 'rgba(100,50,150,0.15)',
+  },
+  vignetteMax: {
+    backgroundColor: 'rgba(50,100,150,0.15)',
   },
 });
