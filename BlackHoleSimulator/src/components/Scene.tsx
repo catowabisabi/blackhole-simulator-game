@@ -319,8 +319,41 @@ class EnemyBH implements EnemyBHInterface {
   radius: number;
   alive: boolean = true;
   maxSpeed: number;
+  labelSprite?: THREE.Sprite;
+  stateSprite?: THREE.Sprite;
+  labelCanvas?: HTMLCanvasElement;
+  labelCtx?: CanvasRenderingContext2D;
+  stateCanvas?: HTMLCanvasElement;
+  stateCtx?: CanvasRenderingContext2D;
+  stateTexture?: THREE.CanvasTexture;
+  enemyIndex: number = 1;
+  enemyTotal: number = 1;
 
-  constructor(x: number, y: number, z: number, scene: THREE.Scene, mass: number, speed: number) {
+  private createTextTexture(text: string, fontSize: number = 24, canvasWidth: number = 128, canvasHeight: number = 48): { canvas: HTMLCanvasElement, ctx: CanvasRenderingContext2D, texture: THREE.CanvasTexture } {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvasWidth;
+    canvas.height = canvasHeight;
+    const ctx = canvas.getContext('2d')!;
+    
+    ctx.font = `bold ${fontSize}px Arial`;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    
+    ctx.strokeStyle = '#000000';
+    ctx.lineWidth = 3;
+    ctx.strokeText(text, canvas.width / 2, canvas.height / 2);
+    
+    ctx.fillStyle = '#FFFFFF';
+    ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+    
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.minFilter = THREE.LinearFilter;
+    texture.needsUpdate = true;
+    
+    return { canvas, ctx, texture };
+  }
+
+  constructor(x: number, y: number, z: number, scene: THREE.Scene, mass: number, speed: number, enemyIndex: number = 1, enemyTotal: number = 1) {
     this.mass = mass;
     this.radius = C.ENEMY_BH_RADIUS_BASE + mass / C.ENEMY_BH_RADIUS_MASS_DIVISOR;
     this.maxSpeed = speed;
@@ -349,6 +382,28 @@ class EnemyBH implements EnemyBHInterface {
     );
     this.ring.rotation.x = Math.PI / 2;
     this.mesh.add(this.ring);
+
+    this.enemyIndex = enemyIndex;
+    this.enemyTotal = enemyTotal;
+
+    const labelData = this.createTextTexture(`${enemyIndex}/${enemyTotal}`, 20, 96, 36);
+    this.labelCanvas = labelData.canvas;
+    this.labelCtx = labelData.ctx;
+    const labelMat = new THREE.SpriteMaterial({ map: labelData.texture, transparent: true, depthWrite: false });
+    this.labelSprite = new THREE.Sprite(labelMat);
+    this.labelSprite.scale.set(6, 3, 1);
+    this.labelSprite.position.set(0, this.radius * 1.4, 0);
+    this.mesh.add(this.labelSprite);
+
+    const stateData = this.createTextTexture('retreating', 18, 128, 36);
+    this.stateCanvas = stateData.canvas;
+    this.stateCtx = stateData.ctx;
+    this.stateTexture = stateData.texture;
+    const stateMat = new THREE.SpriteMaterial({ map: this.stateTexture, transparent: true, depthWrite: false });
+    this.stateSprite = new THREE.Sprite(stateMat);
+    this.stateSprite.scale.set(8, 3, 1);
+    this.stateSprite.position.set(0, this.radius * 1.2, 0);
+    this.mesh.add(this.stateSprite);
   }
 
   update(dt: number, playerPos: THREE.Vector3) {
@@ -364,6 +419,25 @@ class EnemyBH implements EnemyBHInterface {
     }
     this.mesh.position.addScaledVector(this.vel, dt);
     this.ring.rotation.y += C.ENEMY_BH_RING_ROTATION_SPEED;
+
+    if (this.stateCanvas && this.stateCtx && this.stateTexture) {
+      let state = 'retreating';
+      if (dist < C.ENEMY_BH_SIGHTING_RADIUS * 0.5) {
+        state = 'chasing';
+      } else if (dist < C.ENEMY_BH_SIGHTING_RADIUS) {
+        state = 'curious';
+      }
+      this.stateCtx.clearRect(0, 0, this.stateCanvas.width, this.stateCanvas.height);
+      this.stateCtx.font = 'bold 18px Arial';
+      this.stateCtx.textAlign = 'center';
+      this.stateCtx.textBaseline = 'middle';
+      this.stateCtx.strokeStyle = '#000000';
+      this.stateCtx.lineWidth = 3;
+      this.stateCtx.strokeText(state, this.stateCanvas.width / 2, this.stateCanvas.height / 2);
+      this.stateCtx.fillStyle = '#FFFFFF';
+      this.stateCtx.fillText(state, this.stateCanvas.width / 2, this.stateCanvas.height / 2);
+      this.stateTexture.needsUpdate = true;
+    }
   }
 
   dispose(scene: THREE.Scene) {
@@ -374,6 +448,16 @@ class EnemyBH implements EnemyBHInterface {
     (this.mesh.material as THREE.Material).dispose();
     this.ring.geometry.dispose();
     (this.ring.material as THREE.Material).dispose();
+    if (this.labelSprite) {
+      const labelMat = this.labelSprite.material as THREE.SpriteMaterial;
+      if (labelMat.map) (labelMat.map as THREE.Texture).dispose();
+      labelMat.dispose();
+    }
+    if (this.stateSprite && this.stateTexture) {
+      const stateMat = this.stateSprite.material as THREE.SpriteMaterial;
+      this.stateTexture.dispose();
+      stateMat.dispose();
+    }
   }
 }
 
@@ -577,6 +661,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
 
   const playerRef = useRef<Player | null>(null);
   const enemyBHsRef = useRef<EnemyBH[]>([]);
+  const enemyCountRef = useRef(0);
   const keysRef = useRef<{ [key: string]: boolean }>({});
   const gameStateRef = useRef<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const scoreRef = useRef(0);
@@ -682,7 +767,7 @@ const spawnEnemyBH = useCallback((mass: number, speed: number) => {
   const warning = createSpawnWarning(sceneObjectsRef.current.scene, x, 0, z);
   spawnWarningsRef.current.push(warning);
   
-  const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene, mass, speed);
+  const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene, mass, speed, ++enemyCountRef.current, enemyBHsRef.current.length + 1);
   enemyBHsRef.current.push(ebh);
   
   // Play spawn sound
@@ -822,6 +907,7 @@ const spawnEnemyBH = useCallback((mass: number, speed: number) => {
       objectsAbsorbedCountRef.current = 0;
       enemyBHKilledRef.current = 0;
       levelUpPendingRef.current = false;
+      enemyCountRef.current = 0;
       gameStateRef.current = 'idle';
       onGameStateChange('idle');
       keysRef.current = {};
