@@ -461,6 +461,19 @@ class EnemyBH implements EnemyBHInterface {
   }
 }
 
+const createGlowTexture = (color: number, opacity: number): THREE.Texture => {
+  const canvas = document.createElement('canvas');
+  canvas.width = 64; canvas.height = 64;
+  const ctx = canvas.getContext('2d')!;
+  const grad = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+  const c = new THREE.Color(color);
+  grad.addColorStop(0, `rgba(${Math.floor(c.r * 255)},${Math.floor(c.g * 255)},${Math.floor(c.b * 255)},${opacity})`);
+  grad.addColorStop(1, 'rgba(0,0,0,0)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 64, 64);
+  return new THREE.CanvasTexture(canvas);
+};
+
 class Player implements PlayerInterface {
   pos: THREE.Vector3;
   vel: THREE.Vector3;
@@ -675,6 +688,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const hintFirstDeathRef = useRef(false);
   const spawnWarningsRef = useRef<SpawnWarning[]>([]);
   const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: C.CAMERA_DIST_INITIAL, duration: C.CAMERA_ANIM_DURATION_WIN, elapsed: 0, type: 'win' });
+  const ghostEchoRef = useRef<{ mesh: THREE.Mesh; glow: THREE.Sprite } | null>(null);
+  const ghostFadeRef = useRef(1.0);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -690,6 +705,12 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
       if (gameStateRef.current === 'idle') {
         gameStateRef.current = 'playing';
         onGameStateChange('playing');
+        // Clean up ghost echo on restart
+        if (ghostEchoRef.current) {
+          if (sceneObjectsRef.current?.scene) sceneObjectsRef.current.scene.remove(ghostEchoRef.current.mesh);
+          if (ghostEchoRef.current.glow.parent) ghostEchoRef.current.glow.parent.remove(ghostEchoRef.current.glow);
+          ghostEchoRef.current = null;
+        }
       }
     });
     const subUp = Keyboard.addListener('keyup' as any, (e: any) => {
@@ -1051,6 +1072,26 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               onGameStateChange('lost');
               cameraAnimationRef.current = { active: true, targetDist: C.CAMERA_TARGET_DIST_LOSS, duration: C.CAMERA_ANIM_DURATION_LOSS, elapsed: 0, type: 'loss' };
               p.alive = false;
+              // Ghost echo — save player's largest moment as fading silhouette
+              if (p && p.mesh) {
+                const ghostMat = new THREE.MeshBasicMaterial({
+                  color: 0x333333,
+                  transparent: true,
+                  opacity: 1.0,
+                  blending: THREE.AdditiveBlending,
+                });
+                const ghostMesh = new THREE.Mesh(p.mesh.geometry.clone(), ghostMat);
+                ghostMesh.position.copy(p.pos);
+                ghostMesh.scale.copy(p.mesh.scale);
+                scene.add(ghostMesh);
+                const glowTex = createGlowTexture(0x333333, 0.5);
+                const ghostGlow = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex, transparent: true, opacity: 0.5, blending: THREE.AdditiveBlending }));
+                ghostGlow.scale.setScalar(p.radius * 4);
+                ghostGlow.position.copy(p.pos);
+                scene.add(ghostGlow);
+                ghostEchoRef.current = { mesh: ghostMesh, glow: ghostGlow };
+                ghostFadeRef.current = 1.0;
+              }
             }
           }
         }
@@ -1101,6 +1142,21 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       if (sceneObjectsRef.current) {
         const zoomLevel = (sceneObjectsRef.current.controls.dist - C.ZOOM_CALC_MIN) / C.ZOOM_CALC_DENOM;
         onZoomLevelChange(Math.max(0, Math.min(1, zoomLevel)));
+      }
+
+      // Update ghost echo fade
+      if (ghostEchoRef.current) {
+        ghostFadeRef.current -= dt * 0.1;
+        if (ghostFadeRef.current <= 0) {
+          scene.remove(ghostEchoRef.current.mesh);
+          scene.remove(ghostEchoRef.current.glow);
+          ghostEchoRef.current = null;
+        } else {
+          const m = ghostEchoRef.current.mesh;
+          const g = ghostEchoRef.current.glow;
+          (m.material as THREE.MeshBasicMaterial).opacity = ghostFadeRef.current;
+          (g.material as THREE.SpriteMaterial).opacity = ghostFadeRef.current * 0.5;
+        }
       }
 
       renderer.render(scene, camera);
