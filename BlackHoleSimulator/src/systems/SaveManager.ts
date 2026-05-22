@@ -5,6 +5,7 @@ interface SavedData {
   gamesPlayed: number;
   bestLevel: number;
   totalMassAbsorbed: number;
+  difficulty: string;
 }
 
 const SAVE_KEY = '@blackhole_save';
@@ -14,6 +15,7 @@ const defaultData: SavedData = {
   gamesPlayed: 0,
   bestLevel: 1,
   totalMassAbsorbed: 0,
+  difficulty: 'normal',
 };
 
 class SaveManagerClass {
@@ -56,6 +58,11 @@ class SaveManagerClass {
 
   async reset() {
     this.data = { ...defaultData };
+    await this.save();
+  }
+
+  async setDifficulty(difficulty: string) {
+    this.data.difficulty = difficulty;
     await this.save();
   }
 

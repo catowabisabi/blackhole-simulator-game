@@ -29,6 +29,8 @@ interface UIProps {
   highScore?: number;
   gamesPlayed?: number;
   onShowStats?: () => void;
+  difficulty?: 'easy' | 'normal' | 'hard';
+  onDifficultyChange?: (difficulty: 'easy' | 'normal' | 'hard') => void;
 }
 
 export default function UI({
@@ -52,6 +54,8 @@ export default function UI({
   highScore = 0,
   gamesPlayed = 0,
   onShowStats,
+  difficulty = 'normal',
+  onDifficultyChange,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -85,6 +89,26 @@ export default function UI({
         </View>
 
       <View style={styles.hint}>
+        <View style={styles.difficultyRow}>
+          <TouchableOpacity
+            style={[styles.diffBtn, difficulty === 'easy' && styles.diffBtnActive]}
+            onPress={() => onDifficultyChange?.('easy')}
+          >
+            <Text style={[styles.diffBtnText, difficulty === 'easy' && styles.diffBtnTextActive]}>Easy</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.diffBtn, difficulty === 'normal' && styles.diffBtnActive]}
+            onPress={() => onDifficultyChange?.('normal')}
+          >
+            <Text style={[styles.diffBtnText, difficulty === 'normal' && styles.diffBtnTextActive]}>Normal</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.diffBtn, difficulty === 'hard' && styles.diffBtnActive]}
+            onPress={() => onDifficultyChange?.('hard')}
+          >
+            <Text style={[styles.diffBtnText, difficulty === 'hard' && styles.diffBtnTextActive]}>Hard</Text>
+          </TouchableOpacity>
+        </View>
         <Text style={styles.hintText}>拖曳旋轉 · 捏合縮放 / Drag · Pinch to zoom</Text>
       </View>
 
@@ -771,5 +795,32 @@ const styles = StyleSheet.create({
   hsCloseText: {
     fontSize: 13,
     color: 'rgba(180,210,255,0.6)',
+  },
+  difficultyRow: {
+    flexDirection: 'row',
+    justifyContent: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  diffBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 6,
+    backgroundColor: 'rgba(5,5,30,0.8)',
+    borderWidth: 1,
+    borderColor: 'rgba(100,180,255,0.2)',
+    borderRadius: 16,
+  },
+  diffBtnActive: {
+    backgroundColor: 'rgba(100,180,255,0.25)',
+    borderColor: 'rgba(100,180,255,0.5)',
+  },
+  diffBtnText: {
+    fontSize: 11,
+    color: 'rgba(180,210,255,0.5)',
+    fontWeight: '500',
+  },
+  diffBtnTextActive: {
+    color: '#4af',
+    fontWeight: '700',
   },
 });

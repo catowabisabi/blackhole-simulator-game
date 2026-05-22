@@ -31,6 +31,13 @@ const WIN_MASS_THRESHOLD = 50000;
 // Lose condition: hit enemy BH when player is smaller
 const LOSE_MASS_RATIO = 1.2;
 
+// Difficulty presets
+export const DIFFICULTY = {
+  EASY: { spawnRate: 0.7, enemyCount: 2, enemyMass: 0.7, enemySpeed: 0.8 },
+  NORMAL: { spawnRate: 1.0, enemyCount: 3, enemyMass: 1.0, enemySpeed: 1.0 },
+  HARD: { spawnRate: 1.3, enemyCount: 5, enemyMass: 1.4, enemySpeed: 1.3 },
+} as const;
+
 // Level system
 const LEVEL_THRESHOLDS = [0, 10000, 25000, 45000, 75000, 120000];
 const LEVEL_ENEMY_MASS = [0, 15000, 22000, 32000, 48000, 70000];
@@ -100,6 +107,7 @@ interface SceneProps {
   onGameStateChange: (state: 'idle' | 'playing' | 'won' | 'lost') => void;
   onPlayerPosChange: (pos: { x: number; y: number }) => void;
   onLevelChange: (level: number) => void;
+  difficulty?: 'easy' | 'normal' | 'hard';
 }
 
 class OrbitControls {
@@ -571,7 +579,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, difficulty = 'normal' }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -773,6 +781,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const onContextCreate = useCallback((gl: any) => {
     AudioManager.init();
     AudioManager.playBGM();
+    const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY] || DIFFICULTY.NORMAL;
     const { scene, camera, renderer, controls, diskMat } = createSceneObjects(gl);
     sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat };
 
@@ -797,11 +806,12 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
 
       const dt = 0.35 * simSpeed;
       const lvl = levelRef.current;
-      const spawnInterval = LEVEL_SPAWN_INTERVAL[lvl] || 2.5;
-      const maxEnemies = LEVEL_MAX_ENEMIES[lvl] || 6;
-      const enemyMass = LEVEL_ENEMY_MASS[lvl] || 70000;
-      const enemySpeed = LEVEL_ENEMY_SPEED[lvl] || 170;
-      const bodySpawnRate = LEVEL_BODY_SPAWN_RATE[lvl] || 1.5;
+const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY] || DIFFICULTY.NORMAL;
+    const spawnInterval = (LEVEL_SPAWN_INTERVAL[lvl] || 2.5) / diffMult.spawnRate;
+    const maxEnemies = Math.round((LEVEL_MAX_ENEMIES[lvl] || 6) * diffMult.enemyCount / 3);
+    const enemyMass = (LEVEL_ENEMY_MASS[lvl] || 70000) * diffMult.enemyMass;
+    const enemySpeed = (LEVEL_ENEMY_SPEED[lvl] || 170) * diffMult.enemySpeed;
+    const bodySpawnRate = (LEVEL_BODY_SPAWN_RATE[lvl] || 1.5) / diffMult.spawnRate;
 
       const p = playerRef.current;
       if (p && p.alive && gameStateRef.current === 'playing') {

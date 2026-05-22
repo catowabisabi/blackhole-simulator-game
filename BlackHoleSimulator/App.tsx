@@ -31,12 +31,16 @@ export default function App() {
   const [highScore, setHighScore] = useState(0);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   const [showHighScoreModal, setShowHighScoreModal] = useState(false);
+  const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
 
   useEffect(() => {
     AudioManager.init();
     SaveManager.load().then((data) => {
       setHighScore(data.highScore);
       setGamesPlayed(data.gamesPlayed);
+      if (data.difficulty === 'easy' || data.difficulty === 'normal' || data.difficulty === 'hard') {
+        setDifficulty(data.difficulty);
+      }
     });
     return () => {
       AudioManager.cleanup();
@@ -87,6 +91,11 @@ export default function App() {
 
   const handleSpeedChange = useCallback((speed: number) => {
     setSimSpeed(speed);
+  }, []);
+
+  const handleDifficultyChange = useCallback((diff: 'easy' | 'normal' | 'hard') => {
+    setDifficulty(diff);
+    SaveManager.setDifficulty(diff);
   }, []);
 
   const spawnPlanet = useCallback(() => {
@@ -141,6 +150,7 @@ export default function App() {
         onGameStateChange={handleGameStateChange}
         onPlayerPosChange={handlePlayerPosChange}
         onLevelChange={handleLevelChange}
+        difficulty={difficulty}
       />
       <UI
         bodyCount={bodyCount}
@@ -169,6 +179,8 @@ export default function App() {
             [{ text: '關閉 / Close' }]
           );
         }}
+        difficulty={difficulty}
+        onDifficultyChange={handleDifficultyChange}
       />
       {gameState !== 'idle' && (
         <View style={styles.overlay}>
