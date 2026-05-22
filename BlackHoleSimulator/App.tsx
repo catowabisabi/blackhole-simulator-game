@@ -33,6 +33,8 @@ export default function App() {
   
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [zoomLevel, setZoomLevel] = useState(0.5);
+  const [overlayOpacity, setOverlayOpacity] = useState(0);
+  const [overlayType, setOverlayType] = useState<'win' | 'loss' | null>(null);
 
   useEffect(() => {
     AudioManager.init();
@@ -81,6 +83,11 @@ export default function App() {
     setZoomLevel(zl);
   }, []);
 
+  const handleOverlayOpacityChange = useCallback((opacity: number, type: 'win' | 'loss' | null) => {
+    setOverlayOpacity(opacity);
+    setOverlayType(type);
+  }, []);
+
   const handlePlayerPosChange = useCallback((pos: { x: number; y: number }) => {
   }, []);
 
@@ -92,6 +99,8 @@ export default function App() {
     setGameState('idle');
     setScore(0);
     setLevel(1);
+    setOverlayOpacity(0);
+    setOverlayType(null);
   }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
@@ -156,6 +165,7 @@ export default function App() {
         onPlayerPosChange={handlePlayerPosChange}
         onLevelChange={handleLevelChange}
         onZoomLevelChange={handleZoomLevelChange}
+        onOverlayOpacityChange={handleOverlayOpacityChange}
         difficulty={difficulty}
       />
       <UI
@@ -190,7 +200,11 @@ export default function App() {
         zoomLevel={zoomLevel}
       />
       {gameState !== 'idle' && (
-        <View style={styles.overlay}>
+        <View style={[styles.overlay, { 
+          opacity: overlayOpacity,
+          backgroundColor: overlayType === 'win' ? 'rgba(255,255,255,0.9)' : overlayType === 'loss' ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,20,0.88)'
+        }]}>
+          {overlayOpacity >= 0.85 && (
           <View style={styles.overlayContent}>
             {gameState === 'won' && (
               <>
@@ -212,6 +226,7 @@ export default function App() {
               <Text style={styles.restartBtnText}>再玩一次 / Play Again</Text>
             </TouchableOpacity>
           </View>
+          )}
         </View>
       )}
       {gameState === 'idle' && (

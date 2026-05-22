@@ -100,6 +100,14 @@ interface SceneState {
   level: number;
 }
 
+interface CameraAnimation {
+  active: boolean;
+  targetDist: number;
+  duration: number;
+  elapsed: number;
+  type: 'win' | 'loss';
+}
+
 interface SceneProps {
   simSpeed: number;
   trailColor: string | null;
@@ -108,6 +116,7 @@ interface SceneProps {
   onPlayerPosChange: (pos: { x: number; y: number }) => void;
   onLevelChange: (level: number) => void;
   onZoomLevelChange: (zoomLevel: number) => void;
+  onOverlayOpacityChange: (opacity: number, type: 'win' | 'loss' | null) => void;
   difficulty?: 'easy' | 'normal' | 'hard';
 }
 
@@ -584,7 +593,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, difficulty = 'normal' }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, difficulty = 'normal' }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -599,6 +608,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const levelRef = useRef(1);
   const levelUpPendingRef = useRef(false);
   const spawnWarningsRef = useRef<SpawnWarning[]>([]);
+  const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: 420, duration: 2.5, elapsed: 0, type: 'win' });
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -833,6 +843,7 @@ const spawnEnemyBH = useCallback((mass: number, speed: number) => {
       gameStateRef.current = 'idle';
       onGameStateChange('idle');
       keysRef.current = {};
+      cameraAnimationRef.current = { active: false, targetDist: 420, duration: 2.5, elapsed: 0, type: 'win' };
       const player = new Player(0, 0, 0, scene);
       playerRef.current = player;
       spawnEnemyBH(LEVEL_ENEMY_MASS[1], LEVEL_ENEMY_SPEED[1]);
@@ -926,6 +937,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
           AudioManager.stopBGM();
           gameStateRef.current = 'won';
           onGameStateChange('won');
+          cameraAnimationRef.current = { active: true, targetDist: 2000, duration: 2.5, elapsed: 0, type: 'win' };
         }
 
         for (let i = enemyBHsRef.current.length - 1; i >= 0; i--) {
@@ -950,6 +962,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               AudioManager.stopBGM();
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
+              cameraAnimationRef.current = { active: true, targetDist: 60, duration: 2.0, elapsed: 0, type: 'loss' };
               p.alive = false;
             }
           }
@@ -976,6 +989,25 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       const currentTime = performance.now() / 1000;
       updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
 
+      // Update camera animation if active
+      if (cameraAnimationRef.current.active && sceneObjectsRef.current) {
+        const camAnim = cameraAnimationRef.current;
+        const dt_anim = 0.35 * simSpeed;
+        camAnim.elapsed += dt_anim;
+        const progress = Math.min(camAnim.elapsed / camAnim.duration, 1.0);
+        const startDist = controls.dist;
+        controls.dist = startDist + (camAnim.targetDist - startDist) * progress;
+        controls.update();
+        
+        // Update overlay opacity
+        const opacity = progress * 0.9;
+        onOverlayOpacityChange(opacity, camAnim.type);
+        
+        if (progress >= 1.0) {
+          camAnim.active = false;
+        }
+      }
+
       // Report zoom level to UI (0 = min zoom in, 1 = max zoom out)
       if (sceneObjectsRef.current) {
         const zoomLevel = (sceneObjectsRef.current.controls.dist - 60) / 1340;
@@ -995,7 +1027,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         cancelAnimationFrame(animationIdRef.current);
       }
     };
-  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, spawnEnemyBH]);
+  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, spawnEnemyBH]);
 
   useEffect(() => {
     if (trailColor) {
