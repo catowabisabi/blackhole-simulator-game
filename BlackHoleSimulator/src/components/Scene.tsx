@@ -3,6 +3,7 @@ import { View, StyleSheet, PanResponder, Dimensions, Platform, Keyboard, TextInp
 import { GLView } from 'expo-gl';
 import * as THREE from 'three';
 import { SaveManager } from '../systems/SaveManager';
+import { AudioManager } from '../systems/AudioManager';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -769,6 +770,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   }, []);
 
   const onContextCreate = useCallback((gl: any) => {
+    AudioManager.init();
     const { scene, camera, renderer, controls, diskMat } = createSceneObjects(gl);
     sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat };
 
@@ -807,6 +809,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
         for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
           const b = bodiesRef.current[i];
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
+            AudioManager.playSFX('absorb');
             p.grow(b.mass * 0.15);
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * 0.05;
@@ -824,11 +827,13 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
           }
         }
         if (newLevel > levelRef.current) {
+          AudioManager.playSFX('levelup');
           levelRef.current = newLevel;
           levelUpPendingRef.current = true;
           onLevelChange(newLevel);
         }
         if (absorbed >= WIN_MASS_THRESHOLD) {
+          AudioManager.playSFX('win');
           gameStateRef.current = 'won';
           onGameStateChange('won');
         }
@@ -843,11 +848,13 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
           const d = p.pos.distanceTo(ebh.mesh.position);
           if (d < p.radius + ebh.radius - PLAYER_HIT_RADIUS) {
             if (p.mass >= ebh.mass * LOSE_MASS_RATIO) {
+              AudioManager.playSFX('kill');
               p.grow(ebh.mass * 0.3);
               scoreRef.current += 500;
               ebh.dispose(scene);
               enemyBHsRef.current.splice(i, 1);
             } else {
+              AudioManager.playSFX('death');
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
               p.alive = false;

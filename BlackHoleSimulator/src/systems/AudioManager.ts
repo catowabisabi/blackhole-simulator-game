@@ -14,10 +14,6 @@ class AudioManagerClass {
     });
   }
 
-  async playBGM() {
-    if (!this.bgmEnabled || this.bgmSound) return;
-  }
-
   async stopBGM() {
     if (this.bgmSound) {
       await this.bgmSound.stopAsync();
@@ -26,18 +22,87 @@ class AudioManagerClass {
     }
   }
 
-  async playSFX(sfxType: 'absorb' | 'levelup' | 'death' | 'win') {
+  private createWavDataURI(frequency: number, durationSec: number = 0.1): string {
+    const sampleRate = 44100;
+    const numSamples = Math.floor(sampleRate * durationSec);
+    const numChannels = 1;
+    const bitsPerSample = 16;
+    const dataSize = numSamples * numChannels * (bitsPerSample / 8);
+    const headerSize = 44;
+    const fileSize = headerSize + dataSize;
+
+    const buffer = new ArrayBuffer(fileSize);
+    const view = new DataView(buffer);
+    let offset = 0;
+
+    // RIFF chunk descriptor
+    view.setUint8(offset++, 0x52); // R
+    view.setUint8(offset++, 0x49); // I
+    view.setUint8(offset++, 0x46); // F
+    view.setUint8(offset++, 0x46); // F
+    view.setUint32(offset, fileSize - 8, true); offset += 4;
+    view.setUint8(offset++, 0x57); // W
+    view.setUint8(offset++, 0x41); // A
+    view.setUint8(offset++, 0x56); // V
+    view.setUint8(offset++, 0x45); // E
+
+    // fmt sub-chunk
+    view.setUint8(offset++, 0x66); // f
+    view.setUint8(offset++, 0x6D); // m
+    view.setUint8(offset++, 0x74); // t
+    view.setUint8(offset++, 0x20); // space
+    view.setUint32(offset, 16, true); offset += 4; // sub-chunk size
+    view.setUint16(offset, 1, true); offset += 2; // audio format (PCM)
+    view.setUint16(offset, numChannels, true); offset += 2;
+    view.setUint32(offset, sampleRate, true); offset += 4;
+    view.setUint32(offset, sampleRate * numChannels * (bitsPerSample / 8), true); offset += 4;
+    view.setUint16(offset, numChannels * (bitsPerSample / 8), true); offset += 2;
+    view.setUint16(offset, bitsPerSample, true); offset += 2;
+
+    // data sub-chunk
+    view.setUint8(offset++, 0x64); // d
+    view.setUint8(offset++, 0x61); // a
+    view.setUint8(offset++, 0x74); // t
+    view.setUint8(offset++, 0x61); // a
+    view.setUint32(offset, dataSize, true); offset += 4;
+
+    // Generate sine wave samples
+    for (let i = 0; i < numSamples; i++) {
+      const sample = Math.sin(2 * Math.PI * frequency * i / sampleRate);
+      const intSample = Math.round(sample * 32767 * 0.3);
+      view.setInt16(offset, intSample, true);
+      offset += 2;
+    }
+
+    // Convert to base64
+    const bytes = new Uint8Array(buffer);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return 'data:audio/wav;base64,' + btoa(binary);
+  }
+
+  async playSFX(sfxType: 'absorb' | 'kill' | 'levelup' | 'death' | 'win') {
     if (!this.sfxEnabled) return;
     try {
       const freqs: Record<string, number[]> = {
         absorb: [440, 550, 660],
+        kill: [660, 880],
         levelup: [523, 659, 784, 1047],
         death: [400, 300, 200],
         win: [523, 659, 784, 1047, 1319],
       };
       const notes = freqs[sfxType] || freqs.absorb;
       for (let i = 0; i < notes.length; i++) {
-        setTimeout(() => {}, 0);
+        const uri = this.createWavDataURI(notes[i]);
+        const { sound } = await Audio.Sound.createAsync({ uri });
+        await sound.playAsync();
+        setTimeout(async () => {
+          try {
+            await sound.unloadAsync();
+          } catch (_) {}
+        }, 150);
       }
     } catch (e) {
     }
