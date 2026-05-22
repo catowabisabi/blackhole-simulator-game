@@ -128,7 +128,7 @@ class AudioManagerClass {
     return 'data:audio/wav;base64,' + btoa(binary);
   }
 
-  async playSFX(sfxType: 'absorb' | 'kill' | 'levelup' | 'death' | 'win') {
+  async playSFX(sfxType: 'absorb' | 'kill' | 'levelup' | 'death' | 'win' | 'spawn') {
     if (!this.sfxEnabled) return;
     try {
       const freqs: Record<string, number[]> = {
@@ -137,6 +137,7 @@ class AudioManagerClass {
         levelup: [523, 659, 784, 1047],
         death: [400, 300, 200],
         win: [523, 659, 784, 1047, 1319],
+        spawn: [220, 165, 110], // low rumble whoosh
       };
       const notes = freqs[sfxType] || freqs.absorb;
       for (let i = 0; i < notes.length; i++) {

@@ -594,6 +594,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const scoreRef = useRef(0);
   const levelRef = useRef(1);
   const levelUpPendingRef = useRef(false);
+  const spawnWarningsRef = useRef<SpawnWarning[]>([]);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -620,15 +621,79 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
     };
   }, [onGameStateChange]);
 
-  const spawnEnemyBH = useCallback((mass: number, speed: number) => {
-    if (!sceneObjectsRef.current) return;
-    const angle = Math.random() * Math.PI * 2;
-    const dist = 250 + Math.random() * 100;
-    const x = Math.cos(angle) * dist;
-    const z = Math.sin(angle) * dist;
-    const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene, mass, speed);
-    enemyBHsRef.current.push(ebh);
-  }, []);
+interface SpawnWarning {
+  mesh: THREE.Mesh;
+  startTime: number;
+  duration: number;
+  spawnPos: THREE.Vector3;
+}
+
+function createSpawnWarning(scene: THREE.Scene, x: number, y: number, z: number): SpawnWarning {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(30, 2, 8, 32),
+    new THREE.MeshBasicMaterial({
+      color: 0xff00ff,
+      transparent: true,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  ring.position.set(x, y, z);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+  return { mesh: ring, startTime: performance.now() / 1000, duration: 2.0, spawnPos: new THREE.Vector3(x, y, z) };
+}
+
+function updateSpawnWarnings(warnings: SpawnWarning[], scene: THREE.Scene, currentTime: number) {
+  for (let i = warnings.length - 1; i >= 0; i--) {
+    const w = warnings[i];
+    const age = currentTime - w.startTime;
+    if (age >= w.duration) {
+      scene.remove(w.mesh);
+      w.mesh.geometry.dispose();
+      (w.mesh.material as THREE.Material).dispose();
+      warnings.splice(i, 1);
+    } else {
+      const t = age / w.duration;
+      w.mesh.material.opacity = 0.9 * (1 - t);
+      w.mesh.scale.setScalar(1 + t * 0.5);
+      w.mesh.rotation.z += 0.05;
+    }
+  }
+}
+
+const spawnEnemyBH = useCallback((mass: number, speed: number) => {
+  if (!sceneObjectsRef.current) return;
+  const { camera } = sceneObjectsRef.current;
+  const cameraPos = camera.position;
+  const target = sceneObjectsRef.current.controls.target;
+  
+  // Get camera forward direction (from camera toward target)
+  const forward = new THREE.Vector3().subVectors(target, cameraPos).normalize();
+  
+  // Get camera right vector
+  const up = new THREE.Vector3(0, 1, 0);
+  
+  // Random angle within a 90-degree cone in front of camera (spread across ~120 degrees for visibility)
+  const spreadAngle = (Math.random() - 0.5) * Math.PI * 0.7; // -63 to +63 degrees
+  const spawnDir = forward.clone().applyAxisAngle(up, spreadAngle);
+  
+  // Spawn distance at edge of visible area (800-1200 units)
+  const spawnDist = 800 + Math.random() * 400;
+  
+  const x = spawnDir.x * spawnDist;
+  const z = spawnDir.z * spawnDist;
+  
+  // Create spawn warning effect
+  const warning = createSpawnWarning(sceneObjectsRef.current.scene, x, 0, z);
+  spawnWarningsRef.current.push(warning);
+  
+  const ebh = new EnemyBH(x, 0, z, sceneObjectsRef.current.scene, mass, speed);
+  enemyBHsRef.current.push(ebh);
+  
+  // Play spawn sound
+  AudioManager.playSFX('spawn');
+}, []);
 
   const panResponder = useRef(
     PanResponder.create({
@@ -898,6 +963,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         score: scoreRef.current,
         level: levelRef.current,
       });
+
+      // Update spawn warnings (visual indicator for incoming enemy BHs)
+      const currentTime = performance.now() / 1000;
+      updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
 
       // Report zoom level to UI (0 = min zoom in, 1 = max zoom out)
       if (sceneObjectsRef.current) {
