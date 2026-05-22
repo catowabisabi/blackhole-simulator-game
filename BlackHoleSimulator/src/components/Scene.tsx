@@ -771,6 +771,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
 
   const onContextCreate = useCallback((gl: any) => {
     AudioManager.init();
+    AudioManager.playBGM();
     const { scene, camera, renderer, controls, diskMat } = createSceneObjects(gl);
     sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat };
 
@@ -834,6 +835,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
         }
         if (absorbed >= WIN_MASS_THRESHOLD) {
           AudioManager.playSFX('win');
+          AudioManager.stopBGM();
           gameStateRef.current = 'won';
           onGameStateChange('won');
         }
@@ -855,6 +857,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
               enemyBHsRef.current.splice(i, 1);
             } else {
               AudioManager.playSFX('death');
+              AudioManager.stopBGM();
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
               p.alive = false;
