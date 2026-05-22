@@ -98,6 +98,8 @@ interface SceneState {
   gameState: 'idle' | 'playing' | 'won' | 'lost';
   score: number;
   level: number;
+  objectsAbsorbedCount: number;
+  enemyBHKilled: number;
 }
 
 interface CameraAnimation {
@@ -606,6 +608,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const gameStateRef = useRef<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const scoreRef = useRef(0);
   const levelRef = useRef(1);
+  const objectsAbsorbedCountRef = useRef(0);
+  const enemyBHKilledRef = useRef(0);
   const levelUpPendingRef = useRef(false);
   const spawnWarningsRef = useRef<SpawnWarning[]>([]);
   const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: 420, duration: 2.5, elapsed: 0, type: 'win' });
@@ -839,6 +843,8 @@ const spawnEnemyBH = useCallback((mass: number, speed: number) => {
       bhMassRef.current = BH_MASS;
       scoreRef.current = 0;
       levelRef.current = 1;
+      objectsAbsorbedCountRef.current = 0;
+      enemyBHKilledRef.current = 0;
       levelUpPendingRef.current = false;
       gameStateRef.current = 'idle';
       onGameStateChange('idle');
@@ -911,6 +917,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             p.grow(b.mass * 0.15);
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * 0.05;
+            objectsAbsorbedCountRef.current += 1;
             b.dispose(scene);
             bodiesRef.current.splice(i, 1);
           }
@@ -954,6 +961,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               p.grow(ebh.mass * 0.3);
               scoreRef.current += 500;
+              enemyBHKilledRef.current += 1;
               ebh.dispose(scene);
               enemyBHsRef.current.splice(i, 1);
             } else {
@@ -983,6 +991,8 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         gameState: gameStateRef.current,
         score: scoreRef.current,
         level: levelRef.current,
+        objectsAbsorbedCount: objectsAbsorbedCountRef.current,
+        enemyBHKilled: enemyBHKilledRef.current,
       });
 
       // Update spawn warnings (visual indicator for incoming enemy BHs)

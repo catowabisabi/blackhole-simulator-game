@@ -14,6 +14,8 @@ interface SceneState {
   gameState: 'idle' | 'playing' | 'won' | 'lost';
   score: number;
   level: number;
+  objectsAbsorbedCount: number;
+  enemyBHKilled: number;
 }
 
 export default function App() {
@@ -28,6 +30,8 @@ export default function App() {
   const [gameState, setGameState] = useState<'idle' | 'playing' | 'won' | 'lost'>('idle');
   const [score, setScore] = useState(0);
   const [level, setLevel] = useState(1);
+  const [objectsAbsorbedCount, setObjectsAbsorbedCount] = useState(0);
+  const [enemyBHKilled, setEnemyBHKilled] = useState(0);
   const [highScore, setHighScore] = useState(0);
   const [gamesPlayed, setGamesPlayed] = useState(0);
   
@@ -57,6 +61,8 @@ export default function App() {
     setPlayerAbsorbed(stats.playerAbsorbed);
     setScore(stats.score);
     setLevel(stats.level);
+    setObjectsAbsorbedCount(stats.objectsAbsorbedCount);
+    setEnemyBHKilled(stats.enemyBHKilled);
   }, []);
 
   const handleGameStateChange = useCallback(async (state: 'idle' | 'playing' | 'won' | 'lost') => {
@@ -99,6 +105,8 @@ export default function App() {
     setGameState('idle');
     setScore(0);
     setLevel(1);
+    setObjectsAbsorbedCount(0);
+    setEnemyBHKilled(0);
     setOverlayOpacity(0);
     setOverlayType(null);
   }, []);
@@ -210,7 +218,24 @@ export default function App() {
               <>
                 <Text style={styles.overlayTitle}>🎉 勝利！</Text>
                 <Text style={styles.overlaySubtitle}>你已成為超大質量黑洞</Text>
-                <Text style={styles.overlayScore}>最終吸收 {playerAbsorbed}</Text>
+                <View style={styles.statsPanel}>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>吸收物體</Text>
+                    <Text style={styles.statValue}>{objectsAbsorbedCount}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>總質量</Text>
+                    <Text style={styles.statValue}>{playerAbsorbed}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>敵方黑洞</Text>
+                    <Text style={styles.statValue}>{enemyBHKilled}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>最高關卡</Text>
+                    <Text style={styles.statValue}>{level}</Text>
+                  </View>
+                </View>
                 <Text style={styles.overlayScore}>分數 {score}</Text>
               </>
             )}
@@ -218,7 +243,24 @@ export default function App() {
               <>
                 <Text style={styles.overlayTitleLose}>💀 被吞噬了！</Text>
                 <Text style={styles.overlaySubtitle}>撞上了更大的黑洞</Text>
-                <Text style={styles.overlayScore}>最終吸收 {playerAbsorbed}</Text>
+                <View style={styles.statsPanel}>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>吸收物體</Text>
+                    <Text style={styles.statValue}>{objectsAbsorbedCount}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>總質量</Text>
+                    <Text style={styles.statValue}>{playerAbsorbed}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>敵方黑洞</Text>
+                    <Text style={styles.statValue}>{enemyBHKilled}</Text>
+                  </View>
+                  <View style={styles.statRow}>
+                    <Text style={styles.statLabel}>最高關卡</Text>
+                    <Text style={styles.statValue}>{level}</Text>
+                  </View>
+                </View>
                 <Text style={styles.overlayScore}>分數 {score}</Text>
               </>
             )}
@@ -331,6 +373,32 @@ const styles = StyleSheet.create({
     fontSize: 18,
     color: '#4af',
     marginBottom: 8,
+  },
+  statsPanel: {
+    backgroundColor: 'rgba(50,100,200,0.15)',
+    borderRadius: 16,
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(100,150,255,0.3)',
+    alignItems: 'stretch',
+    minWidth: 180,
+  },
+  statRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: 'rgba(180,210,255,0.8)',
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#6cf',
   },
   restartBtn: {
     marginTop: 20,
