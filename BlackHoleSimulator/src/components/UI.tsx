@@ -54,6 +54,7 @@ export default function UI({
   onShowStats,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
+  const [showStatsModal, setShowStatsModal] = useState(false);
   const [localSpeed, setLocalSpeed] = useState(simSpeed);
 
   const handleSpeedChange = (value: number) => {
@@ -71,7 +72,7 @@ export default function UI({
 <View style={styles.topBar}>
           <Text style={styles.title}>BLACK HOLE</Text>
           <View style={styles.topRightRow}>
-            <TouchableOpacity style={styles.scoreChip} onPress={onShowStats}>
+            <TouchableOpacity style={styles.scoreChip} onPress={() => setShowStatsModal(true)}>
               <Text style={styles.scoreChipLabel}>分</Text>
               <Text style={styles.scoreValue}>{score}</Text>
             </TouchableOpacity>
@@ -260,12 +261,12 @@ export default function UI({
       </Modal>
 
       <Modal
-        visible={false}
+        visible={showStatsModal}
         animationType="fade"
         transparent={true}
-        onRequestClose={() => {}}
+        onRequestClose={() => setShowStatsModal(false)}
       >
-        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1}>
+        <TouchableOpacity style={styles.modalOverlay} activeOpacity={1} onPress={() => setShowStatsModal(false)}>
           <View style={styles.highScoreSheet}>
             <Text style={styles.highScoreTitle}>📊 統計 / Statistics</Text>
             <View style={styles.highScoreRow}>
@@ -276,7 +277,7 @@ export default function UI({
               <Text style={styles.highScoreLabel}>遊戲次數 Games</Text>
               <Text style={styles.highScoreNum}>{gamesPlayed}</Text>
             </View>
-            <TouchableOpacity style={styles.hsCloseBtn} onPress={() => {}}>
+            <TouchableOpacity style={styles.hsCloseBtn} onPress={() => setShowStatsModal(false)}>
               <Text style={styles.hsCloseText}>關閉 / Close</Text>
             </TouchableOpacity>
           </View>

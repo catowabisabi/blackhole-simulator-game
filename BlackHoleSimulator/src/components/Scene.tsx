@@ -2,6 +2,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import { View, StyleSheet, PanResponder, Dimensions, Platform, Keyboard, TextInput, Text } from 'react-native';
 import { GLView } from 'expo-gl';
 import * as THREE from 'three';
+import { SaveManager } from '../systems/SaveManager';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -456,6 +457,7 @@ class Player implements PlayerInterface {
     if (this.mesh) {
       this.mesh.scale.setScalar(this.radius / PLAYER_INITIAL_RADIUS);
     }
+    SaveManager.addAbsorbedMass(massGain);
   }
 
   dispose(scene: THREE.Scene) {
