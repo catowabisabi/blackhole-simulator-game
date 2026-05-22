@@ -30,7 +30,7 @@ export default function App() {
   const [level, setLevel] = useState(1);
   const [highScore, setHighScore] = useState(0);
   const [gamesPlayed, setGamesPlayed] = useState(0);
-  const [showHighScoreModal, setShowHighScoreModal] = useState(false);
+  
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [zoomLevel, setZoomLevel] = useState(0.5);
 
@@ -196,7 +196,7 @@ export default function App() {
               <>
                 <Text style={styles.overlayTitle}>🎉 勝利！</Text>
                 <Text style={styles.overlaySubtitle}>你已成為超大質量黑洞</Text>
-                <Text style={styles.overlayScore}>最終質量 {playerMass}</Text>
+                <Text style={styles.overlayScore}>最終吸收 {playerAbsorbed}</Text>
                 <Text style={styles.overlayScore}>分數 {score}</Text>
               </>
             )}
@@ -204,7 +204,7 @@ export default function App() {
               <>
                 <Text style={styles.overlayTitleLose}>💀 被吞噬了！</Text>
                 <Text style={styles.overlaySubtitle}>撞上了更大的黑洞</Text>
-                <Text style={styles.overlayScore}>最終質量 {playerMass}</Text>
+                <Text style={styles.overlayScore}>最終吸收 {playerAbsorbed}</Text>
                 <Text style={styles.overlayScore}>分數 {score}</Text>
               </>
             )}
