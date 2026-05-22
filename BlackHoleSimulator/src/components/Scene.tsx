@@ -90,6 +90,8 @@ interface SceneProps {
   onFirstEnemyEncounter?: () => void;
   onFirstLevelUp?: () => void;
   onFirstDeath?: () => void;
+  isPaused?: boolean;
+  onResume?: () => void;
   difficulty?: 'easy' | 'normal' | 'hard';
 }
 
@@ -566,7 +568,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, difficulty = 'normal' }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, isPaused = false, onResume, difficulty = 'normal' }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -858,6 +860,7 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
     let enemySpawnTimer = 0;
 
     const animate = () => {
+      if (isPaused) return;
       t += C.FRAME_TIME;
       diskMat.uniforms.time.value = t;
       if (playerRef.current) {

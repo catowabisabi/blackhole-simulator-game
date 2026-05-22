@@ -41,6 +41,10 @@ export default function App() {
   const [overlayType, setOverlayType] = useState<'win' | 'loss' | null>(null);
   const [hintText, setHintText] = useState('');
   const [showHint, setShowHint] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
+
+  const handlePause = useCallback(() => setIsPaused(true), []);
+  const handleResume = useCallback(() => setIsPaused(false), []);
 
   useEffect(() => {
     AudioManager.init();
@@ -111,6 +115,7 @@ export default function App() {
     setEnemyBHKilled(0);
     setOverlayOpacity(0);
     setOverlayType(null);
+    setIsPaused(false);
   }, []);
 
   const handleSpeedChange = useCallback((speed: number) => {
@@ -212,6 +217,8 @@ export default function App() {
         onFirstEnemyEncounter={handleFirstEnemyEncounter}
         onFirstLevelUp={handleFirstLevelUp}
         onFirstDeath={handleFirstDeath}
+        isPaused={isPaused}
+        onResume={handleResume}
         difficulty={difficulty}
       />
       <UI
@@ -246,6 +253,8 @@ export default function App() {
         zoomLevel={zoomLevel}
         hintText={hintText}
         showHint={showHint}
+        isPaused={isPaused}
+        onPause={handlePause}
       />
       {gameState !== 'idle' && (
         <View style={[styles.overlay, { 

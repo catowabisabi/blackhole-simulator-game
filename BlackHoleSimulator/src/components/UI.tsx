@@ -34,6 +34,8 @@ interface UIProps {
   zoomLevel?: number;
   hintText?: string;
   showHint?: boolean;
+  isPaused?: boolean;
+  onPause?: () => void;
 }
 
 export default function UI({
@@ -62,6 +64,8 @@ export default function UI({
   zoomLevel = 0.5,
   hintText = '',
   showHint = false,
+  isPaused = false,
+  onPause,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -91,6 +95,11 @@ export default function UI({
                 玩家 <Text style={styles.statValue}>{playerAbsorbed}</Text> · 質量 <Text style={styles.statValue}>{bhMass}</Text>
               </Text>
             </View>
+            {gameState === 'playing' && (
+              <TouchableOpacity style={styles.pauseBtn} onPress={() => onPause?.()}>
+                <Text style={styles.pauseBtnText}>⏸</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -332,6 +341,15 @@ export default function UI({
       {showHint && hintText && (
         <View style={styles.hintToast}>
           <Text style={styles.hintToastText}>{hintText}</Text>
+        </View>
+      )}
+
+      {isPaused && (
+        <View style={styles.pauseOverlay}>
+          <Text style={styles.pauseTitle}>⏸ PAUSED</Text>
+          <TouchableOpacity style={styles.resumeBtn} onPress={() => onPause?.()}>
+            <Text style={styles.resumeBtnText}>繼續 / Resume</Text>
+          </TouchableOpacity>
         </View>
       )}
     </>
@@ -888,5 +906,54 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     paddingVertical: 8,
     paddingHorizontal: 16,
+  },
+  pauseBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: 'rgba(0,0,40,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(100,150,255,0.4)',
+    marginLeft: 6,
+  },
+  pauseBtnText: {
+    fontSize: 16,
+    color: '#fff',
+  },
+  pauseOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,20,0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    zIndex: 100,
+  },
+  pauseTitle: {
+    fontSize: 42,
+    fontWeight: '900',
+    color: '#fff',
+    marginBottom: 30,
+    letterSpacing: 4,
+    textShadowColor: 'rgba(100,150,255,0.5)',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 20,
+  },
+  resumeBtn: {
+    paddingVertical: 14,
+    paddingHorizontal: 40,
+    backgroundColor: 'rgba(0,150,255,0.3)',
+    borderRadius: 25,
+    borderWidth: 2,
+    borderColor: 'rgba(0,200,255,0.6)',
+  },
+  resumeBtnText: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#fff',
   },
 });
