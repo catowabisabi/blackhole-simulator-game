@@ -4,6 +4,7 @@ import { GLView } from 'expo-gl';
 import * as THREE from 'three';
 import { SaveManager } from '../systems/SaveManager';
 import { AudioManager } from '../systems/AudioManager';
+import * as Haptics from 'expo-haptics';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -811,6 +812,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
           const b = bodiesRef.current[i];
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
             AudioManager.playSFX('absorb');
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
             p.grow(b.mass * 0.15);
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * 0.05;
@@ -829,12 +831,14 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
         }
         if (newLevel > levelRef.current) {
           AudioManager.playSFX('levelup');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           levelRef.current = newLevel;
           levelUpPendingRef.current = true;
           onLevelChange(newLevel);
         }
         if (absorbed >= WIN_MASS_THRESHOLD) {
           AudioManager.playSFX('win');
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
           AudioManager.stopBGM();
           gameStateRef.current = 'won';
           onGameStateChange('won');
@@ -851,12 +855,14 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
           if (d < p.radius + ebh.radius - PLAYER_HIT_RADIUS) {
             if (p.mass >= ebh.mass * LOSE_MASS_RATIO) {
               AudioManager.playSFX('kill');
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               p.grow(ebh.mass * 0.3);
               scoreRef.current += 500;
               ebh.dispose(scene);
               enemyBHsRef.current.splice(i, 1);
             } else {
               AudioManager.playSFX('death');
+              Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
               AudioManager.stopBGM();
               gameStateRef.current = 'lost';
               onGameStateChange('lost');
