@@ -648,7 +648,7 @@ function updateSpawnWarnings(warnings: SpawnWarning[], scene: THREE.Scene, curre
       warnings.splice(i, 1);
     } else {
       const t = age / w.duration;
-      w.mesh.material.opacity = C.SPAWN_WARNING_OPACITY_START * (1 - t);
+      (w.mesh.material as THREE.MeshBasicMaterial).opacity = C.SPAWN_WARNING_OPACITY_START * (1 - t);
       w.mesh.scale.setScalar(C.SPAWN_WARNING_SCALE_START + t * C.SPAWN_WARNING_SCALE_GROWTH);
       w.mesh.rotation.z += C.SPAWN_WARNING_ROTATION_SPEED;
     }
