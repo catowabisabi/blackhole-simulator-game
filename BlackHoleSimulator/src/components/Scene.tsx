@@ -846,6 +846,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const bifurcationSonarTimerRef = useRef(0);
   const bifurcationPulsesRef = useRef<BifurcationPulse[]>([]);
   const levelUpFlashRef = useRef(0);
+  const noReturnFlashesRef = useRef<NoReturnFlash[]>([]);
   const cameraShakeOffsetRef = useRef({ x: 0, y: 0 });
 
   const sceneObjectsRef = useRef<{
@@ -1078,6 +1079,33 @@ function updateBifurcationPulses(pulses: BifurcationPulse[], scene: THREE.Scene,
       p.mesh.scale.setScalar(scale);
       const color = new THREE.Color(C.BIFURCATION_SONAR_COLOR).lerp(new THREE.Color(C.BIFURCATION_SONAR_END_COLOR), t);
       mat.color = color;
+    }
+  }
+}
+
+interface NoReturnFlash {
+  light: THREE.PointLight;
+  startTime: number;
+  duration: number;
+}
+
+function createNoReturnFlash(scene: THREE.Scene, x: number, y: number, z: number): NoReturnFlash {
+  const light = new THREE.PointLight(C.POINT_OF_NO_RETURN_FLASH_COLOR, C.POINT_OF_NO_RETURN_FLASH_INTENSITY, 50);
+  light.position.set(x, y, z);
+  scene.add(light);
+  return { light, startTime: performance.now() / 1000, duration: C.POINT_OF_NO_RETURN_FLASH_DURATION };
+}
+
+function updateNoReturnFlashes(flashes: NoReturnFlash[], scene: THREE.Scene, currentTime: number) {
+  for (let i = flashes.length - 1; i >= 0; i--) {
+    const f = flashes[i];
+    const age = currentTime - f.startTime;
+    if (age >= f.duration) {
+      scene.remove(f.light);
+      flashes.splice(i, 1);
+    } else {
+      const t = age / f.duration;
+      f.light.intensity = C.POINT_OF_NO_RETURN_FLASH_INTENSITY * (1 - t);
     }
   }
 }
@@ -1349,6 +1377,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             bhMassRef.current += b.mass * C.BH_MASS_GROW_RATIO;
             objectsAbsorbedCountRef.current += 1;
             ringPulsesRef.current.push(createRingPulse(scene, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z));
+            noReturnFlashesRef.current.push(createNoReturnFlash(scene, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z));
             b.dispose(scene);
             bodiesRef.current.splice(i, 1);
           }
@@ -1490,6 +1519,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         }
       }
       updateBifurcationPulses(bifurcationPulsesRef.current, scene, currentTime, p ? p.radius : 8);
+      updateNoReturnFlashes(noReturnFlashesRef.current, scene, currentTime);
 
       if (bifurcationZoneRef.current && sceneObjectsRef.current) {
         const shake = Math.sin(performance.now() * 0.03) * C.BIFURCATION_SHAKE_INTENSITY * bifurcationIntensityRef.current;

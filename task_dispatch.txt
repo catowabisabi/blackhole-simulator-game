@@ -1,48 +1,8 @@
-TASK: Fix [Shader] Bifurcation indicator - pre-level transition visual shift
+TASK: Implement point-of-no-return flash effect in Scene.tsx
 
-REPO: /mnt/c/Users/enoma/Desktop/opencode-work/agent-works/game/blackhole-simulator
+When a body is absorbed (distance < playerRadius), create a brief white flash sprite at that world position. The flash should scale up (1→3) and fade out (opacity 1→0) over 150ms. Add constants: POINT_OF_NO_RETURN_FLASH_DURATION=0.15, POINT_OF_NO_RETURN_FLASH_COLOR=0xffffff
 
-CONTEXT:
-- #29 from todo list, priority 7, status new, source concept:#18
-- Concept: at level thresholds (bifurcation points), game world subtly shifts to build anticipation
-- LEVEL_THRESHOLDS = [0, 10000, 25000, 45000, 75000, 120000]
-- Need to detect when player absorbed mass is within 90% of next LEVEL_THRESHOLD
+Also add a hasTriggeredNoReturnFlash flag to Body class to prevent repeat triggers.
 
-STEPS:
-1. Read BlackHoleSimulator/src/systems/constants.ts to confirm LEVEL_THRESHOLDS values
-2. Read BlackHoleSimulator/src/components/Scene.tsx around lines 1304-1330 (level detection logic) and lines 1419-1436 (camera animation section)
-3. Add bifurcation detection and effects:
-
-   A. BIFURCATION ZONE DETECTION (in game loop around line 1304):
-      - After computing newLevel, check if player is in "bifurcation zone" (within 90% of next LEVEL_THRESHOLD)
-      - Example: if next threshold is 10000 and player has >= 9000, bifurcation zone is active
-      - Add refs: bifurcationZoneRef (boolean), bifurcationIntensityRef (0-1)
-
-   B. CAMERA SHAKE (in render loop around line 1420):
-      - When bifurcationZoneRef is true, add small random jitter to camera position
-      - displacement = sin(time * 30) * 0.05 * bifurcationIntensityRef
-      - When approaching threshold: intensity ramps from 0 to 1 as player gets closer
-      - Reset to 0 when bifurcation zone exits
-
-   C. SONAR PULSE RING (in game loop, separate from ringPulse):
-      - Create a new createBifurcationPulse() function similar to createRingPulse() but:
-        - Centered on player position, not absorbed object
-        - Larger radius (player radius * 3), expands to 8x
-        - Color: deep violet to pale blue gradient
-        - Triggered every 2 seconds while in bifurcation zone
-        - On actual level-up: burst = fast expanding ring + brief screen flash
-
-   D. LEVEL-UP BURST EFFECT:
-      - In the existing level-up code (line 1312), add a burstRing animation
-      - When newLevel > levelRef.current, trigger goldenBurstRef + screen flash
-
-   E. CONSTANTS in constants.ts:
-      - BIFURCATION_ZONE_RATIO = 0.9 (90% of threshold triggers zone)
-      - BIFURCATION_SHAKE_INTENSITY = 0.05
-      - BIFURCATION_SONAR_INTERVAL = 2.0 (seconds between sonar pulses)
-      - BIFURCATION_STAR_DENSITY_MULT = 1.5
-
-4. tsc --noEmit to verify, fix any TypeScript errors
-
-keywords: significance, text-completion-placeholder, context
+keywords: emergence, subscriber, fault-tolerance, zooming interface, games
 ULW
