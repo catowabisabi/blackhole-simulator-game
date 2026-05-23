@@ -1,17 +1,20 @@
-TASK: Fix [UI] Win/Loss overlay shows playerMass instead of playerAbsorbed
+TASK: Fix [UI] Mass upgrade purchase pulse feedback
 
 REPO: /mnt/c/Users/enoma/Desktop/opencode-work/agent-works/game/blackhole-simulator
 
 CONTEXT:
-- App.tsx win/loss overlay displays playerMass (BH radius) instead of playerAbsorbed (total absorbed)
-- Find gameState === won/lost JSX and fix score display to show absorbed total
-- playerAbsorbed is available via props or SaveManager.get()
+- When player buys an upgrade (mass, speed, etc.), there is no visual feedback confirming purchase worked
+- Need to add: (1) brief pulse animation on player BH, (2) floating "+N MASS" / "+SPEED" indicator
+- This is the only remaining pending TODO from the painpoint list
 
 STEPS:
-1. Read BlackHoleSimulator/App.tsx around win/loss overlay
-2. Find where playerMass is displayed in overlay
-3. Change to show playerAbsorbed (pass as prop from Scene if needed)
-4. tsc --noEmit to verify
+1. Read BlackHoleSimulator/App.tsx to find the upgrade purchase buttons (look for upgrade-related onPress handlers)
+2. Read BlackHoleSimulator/src/components/Scene.tsx around the player BH (Player class, grow() method) to understand how to trigger pulse
+3. Add a visual pulse effect on the player BH when upgrade is purchased:
+   - In Player class (Scene.tsx), add a purchasePulse property and animate it in the render loop
+   - OR add a floating text indicator mesh that appears and fades
+4. Wire the upgrade purchase in App.tsx to call into Scene's player reference and trigger the pulse
+5. tsc --noEmit to verify, fix any TypeScript errors
 
-keywords: identity, risk variance, parameter inference
+keywords: breach, source attribution, thickening
 ULW

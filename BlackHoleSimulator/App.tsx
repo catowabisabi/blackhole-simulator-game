@@ -220,6 +220,7 @@ export default function App() {
         isPaused={isPaused}
         onResume={handleResume}
         difficulty={difficulty}
+        onPurchaseUpgrade={(fn: any) => { (window as any).__purchaseUpgrade = fn; }}
       />
       <UI
         bodyCount={bodyCount}
@@ -255,6 +256,9 @@ export default function App() {
         showHint={showHint}
         isPaused={isPaused}
         onPause={handlePause}
+        onUpgradePurchase={(type: 'mass' | 'speed', amount: number) => {
+          (window as any).__purchaseUpgrade?.(type, amount);
+        }}
       />
       {gameState !== 'idle' && (
         <View style={[styles.overlay, { 

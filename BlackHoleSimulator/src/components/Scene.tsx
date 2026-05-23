@@ -52,9 +52,11 @@ interface PlayerInterface {
   absorbedMass: number;
   mesh?: THREE.Mesh;
   glow?: THREE.Sprite;
+  purchasePulse: number;
   update: (dt: number, keys: { [key: string]: boolean }, enemyBHs: EnemyBH[]) => void;
   dispose: (scene: THREE.Scene) => void;
   grow: (massGain: number) => void;
+  triggerPurchasePulse: (type: 'mass' | 'speed', amount: number) => void;
 }
 
 interface SceneState {
@@ -93,6 +95,7 @@ interface SceneProps {
   isPaused?: boolean;
   onResume?: () => void;
   difficulty?: 'easy' | 'normal' | 'hard';
+  onPurchaseUpgrade?: (type: 'mass' | 'speed', amount: number) => void;
 }
 
 class OrbitControls {
@@ -523,8 +526,15 @@ class Player implements PlayerInterface {
   alive: boolean = true;
   absorbedMass: number = 0;
   growthFlash: number = 0;
+  purchasePulse: number = 0;
   mesh?: THREE.Mesh;
   glow?: THREE.Sprite;
+  pulseRing?: THREE.Mesh;
+  purchasePulseLabel?: THREE.Sprite;
+  labelCanvas?: HTMLCanvasElement;
+  labelCtx?: CanvasRenderingContext2D;
+  labelTexture?: THREE.CanvasTexture;
+  purchasePulseType: 'mass' | 'speed' | null = null;
 
   constructor(x: number, y: number, z: number, scene: THREE.Scene) {
     this.pos = new THREE.Vector3(x, y, z);
@@ -549,6 +559,31 @@ class Player implements PlayerInterface {
     this.glow = new THREE.Sprite(glowMat);
     this.glow.scale.set(this.radius * C.PLAYER_GLOW_SCALE, this.radius * C.PLAYER_GLOW_SCALE, 1);
     this.mesh.add(this.glow);
+
+    // Create pulse ring for purchase feedback
+    const ringGeo = new THREE.TorusGeometry(this.radius * 1.5, 0.4, 8, 48);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0,
+      blending: THREE.AdditiveBlending,
+    });
+    this.pulseRing = new THREE.Mesh(ringGeo, ringMat);
+    this.pulseRing.rotation.x = Math.PI / 2;
+    scene.add(this.pulseRing);
+
+    // Create label canvas for floating text
+    this.labelCanvas = document.createElement('canvas');
+    this.labelCanvas.width = 256;
+    this.labelCanvas.height = 64;
+    this.labelCtx = this.labelCanvas.getContext('2d')!;
+    this.labelTexture = new THREE.CanvasTexture(this.labelCanvas);
+    const labelMat = new THREE.SpriteMaterial({ map: this.labelTexture, transparent: true, depthWrite: false });
+    this.purchasePulseLabel = new THREE.Sprite(labelMat);
+    this.purchasePulseLabel.scale.set(12, 3, 1);
+    this.purchasePulseLabel.position.set(0, this.radius * 2.5, 0);
+    this.purchasePulseLabel.visible = false;
+    scene.add(this.purchasePulseLabel);
   }
 
   update(dt: number, keys: { [key: string]: boolean }, enemyBHs: EnemyBH[]) {
@@ -582,6 +617,28 @@ class Player implements PlayerInterface {
         }
       }
     }
+
+    // Animate purchase pulse
+    if (this.purchasePulse > 0) {
+      this.purchasePulse -= dt * 2.0; // Decay faster
+      if (this.pulseRing) {
+        const mat = this.pulseRing.material as THREE.MeshBasicMaterial;
+        mat.opacity = this.purchasePulse * 0.8;
+        const scale = 1.0 + (1.0 - this.purchasePulse) * 1.5;
+        this.pulseRing.scale.setScalar(scale);
+        this.pulseRing.position.copy(this.pos);
+        this.pulseRing.rotation.z += dt * 3.0;
+      }
+      if (this.purchasePulseLabel && this.labelCanvas && this.labelCtx && this.labelTexture) {
+        this.purchasePulseLabel.position.y = this.radius * 2.5 + (1.0 - this.purchasePulse) * 8;
+        (this.purchasePulseLabel.material as THREE.SpriteMaterial).opacity = this.purchasePulse;
+        this.purchasePulseLabel.position.copy(this.pos);
+      }
+      if (this.purchasePulse <= 0) {
+        if (this.pulseRing) (this.pulseRing.material as THREE.MeshBasicMaterial).opacity = 0;
+        if (this.purchasePulseLabel) this.purchasePulseLabel.visible = false;
+      }
+    }
   }
 
   grow(massGain: number) {
@@ -593,6 +650,40 @@ class Player implements PlayerInterface {
     }
     SaveManager.addAbsorbedMass(massGain);
     this.growthFlash = C.GROWTH_FLASH_RESET;
+  }
+
+  triggerPurchasePulse(type: 'mass' | 'speed', amount: number) {
+    this.purchasePulse = 1.0;
+    this.purchasePulseType = type;
+
+    // Update pulse ring color based on type
+    if (this.pulseRing) {
+      const mat = this.pulseRing.material as THREE.MeshBasicMaterial;
+      mat.color.setHex(type === 'mass' ? 0x00ffaa : 0xffaa00);
+      mat.opacity = 0.8;
+      this.pulseRing.scale.setScalar(1.0);
+    }
+
+    // Update label texture
+    if (this.labelCtx && this.labelCanvas && this.labelTexture) {
+      this.labelCtx.clearRect(0, 0, this.labelCanvas.width, this.labelCanvas.height);
+      const text = type === 'mass' ? `+${Math.round(amount)} MASS` : `+${amount}x SPEED`;
+      const textColor = type === 'mass' ? '#00ffaa' : '#ffaa00';
+      this.labelCtx.font = 'bold 28px Arial';
+      this.labelCtx.textAlign = 'center';
+      this.labelCtx.textBaseline = 'middle';
+      this.labelCtx.strokeStyle = '#000000';
+      this.labelCtx.lineWidth = 4;
+      this.labelCtx.strokeText(text, this.labelCanvas.width / 2, this.labelCanvas.height / 2);
+      this.labelCtx.fillStyle = textColor;
+      this.labelCtx.fillText(text, this.labelCanvas.width / 2, this.labelCanvas.height / 2);
+      this.labelTexture.needsUpdate = true;
+    }
+
+    if (this.purchasePulseLabel) {
+      this.purchasePulseLabel.visible = true;
+      this.purchasePulseLabel.position.y = this.radius * 2.5;
+    }
   }
 
   dispose(scene: THREE.Scene) {
@@ -722,7 +813,7 @@ function createSceneObjects(gl: any) {
   return { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat };
 }
 
-export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, isPaused = false, onResume, difficulty = 'normal' }: SceneProps) {
+export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, isPaused = false, onResume, difficulty = 'normal', onPurchaseUpgrade }: SceneProps) {
   const glViewRef = useRef<any>(null);
 
   const bodiesRef = useRef<Body[]>([]);
@@ -1123,6 +1214,14 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
     }
   }, []);
 
+  // Handle upgrade purchase callbacks to trigger visual feedback
+  useEffect(() => {
+    if (!onPurchaseUpgrade || !playerRef.current) return;
+    (window as any).__purchaseUpgrade = (type: 'mass' | 'speed', amount: number) => {
+      playerRef.current?.triggerPurchasePulse(type, amount);
+    };
+  }, [onPurchaseUpgrade]);
+
   const onContextCreate = useCallback((gl: any) => {
     AudioManager.init();
     AudioManager.playBGM();
@@ -1370,7 +1469,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         cancelAnimationFrame(animationIdRef.current);
       }
     };
-  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, spawnEnemyBH]);
+  }, [simSpeed, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, spawnEnemyBH, onPurchaseUpgrade]);
 
   useEffect(() => {
     if (trailColor) {

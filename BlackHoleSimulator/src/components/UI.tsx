@@ -36,6 +36,7 @@ interface UIProps {
   showHint?: boolean;
   isPaused?: boolean;
   onPause?: () => void;
+  onUpgradePurchase?: (type: 'mass' | 'speed', amount: number) => void;
 }
 
 export default function UI({
@@ -66,6 +67,7 @@ export default function UI({
   showHint = false,
   isPaused = false,
   onPause,
+  onUpgradePurchase,
 }: UIProps) {
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
@@ -228,6 +230,41 @@ export default function UI({
               </TouchableOpacity>
             </View>
           )}
+
+          {/* Mass Upgrade Button */}
+          <View style={styles.upgradeRow}>
+            <TouchableOpacity
+              style={styles.upgradeBtn}
+              onPress={() => {
+                if (onUpgradePurchase) {
+                  onUpgradePurchase('mass', 100);
+                  (window as any).__purchaseUpgrade?.('mass', 100);
+                }
+              }}
+            >
+              <Text style={styles.upgradeIcon}>📦</Text>
+              <View>
+                <Text style={styles.upgradeZh}>增加質量</Text>
+                <Text style={styles.upgradeEn}>+100 MASS</Text>
+              </View>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.upgradeBtnSpeed}
+              onPress={() => {
+                if (onUpgradePurchase) {
+                  onUpgradePurchase('speed', 2);
+                  (window as any).__purchaseUpgrade?.('speed', 2);
+                }
+              }}
+            >
+              <Text style={styles.upgradeIcon}>⚡</Text>
+              <View>
+                <Text style={styles.upgradeZh}>增加速度</Text>
+                <Text style={styles.upgradeEn}>+2x SPEED</Text>
+              </View>
+            </TouchableOpacity>
+          </View>
         </View>
 
       <Modal
@@ -598,6 +635,45 @@ const styles = StyleSheet.create({
   randomBtnText: {
     fontSize: 11,
     color: '#ddeeff',
+  },
+  upgradeRow: {
+    flexDirection: 'row',
+    gap: 10,
+    marginTop: 10,
+  },
+  upgradeBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    backgroundColor: 'rgba(0,50,30,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(0,255,150,0.3)',
+    borderRadius: 12,
+  },
+  upgradeBtnSpeed: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    padding: 10,
+    backgroundColor: 'rgba(50,40,0,0.92)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,180,0,0.3)',
+    borderRadius: 12,
+  },
+  upgradeIcon: {
+    fontSize: 20,
+  },
+  upgradeZh: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#ddeeff',
+  },
+  upgradeEn: {
+    fontSize: 10,
+    color: 'rgba(180,210,255,0.6)',
   },
   modalOverlay: {
     flex: 1,
