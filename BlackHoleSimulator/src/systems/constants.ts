@@ -94,7 +94,8 @@ export const ENEMY_BH_FORCE_TO_PLAYER = 20;    // Force pulling toward player
 export const ENEMY_BH_RING_RADIUS_MULT = 1.6;  // Ring radius = radius * 1.6
 export const ENEMY_BH_RING_THICKNESS = 1.0;    // Ring thickness
 export const ENEMY_BH_RING_ROTATION_SPEED = 0.02; // Ring rotation speed
-export const ENEMY_BH_SIGHTING_RADIUS = 0.1;   // Minimum distance to start moving toward player
+export const ENEMY_BH_SIGHTING_RADIUS = 0.1;
+export const GRAVITY_PULL_SCALE = 0.005;   // Minimum distance to start moving toward player
 
 // Spawn orbit velocities
 export const SPAWN_ORBIT_SPEED_BASE = 0.85;    // Base orbital speed multiplier

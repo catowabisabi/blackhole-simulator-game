@@ -165,6 +165,7 @@ class Body implements BodyInterface {
   tailColor: THREE.Color;
   tailMass: number[] = [];
   massOpacity: number;
+  inPullZone: boolean = false;
 
   constructor(
     x: number, y: number, z: number,
@@ -671,7 +672,23 @@ function createSceneObjects(gl: any) {
   diskMesh.rotation.x = -Math.PI / 2;
   scene.add(diskMesh);
 
-  return { scene, camera, renderer, controls, diskMat };
+  const pullRadius = C.BH_MASS * C.GRAVITY_PULL_SCALE;
+  const pullRingMat = new THREE.MeshBasicMaterial({
+    color: 0xff6633,
+    transparent: true,
+    opacity: 0.15,
+    side: THREE.DoubleSide,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+  });
+  const pullRing = new THREE.Mesh(
+    new THREE.TorusGeometry(pullRadius, 0.5, 8, 80),
+    pullRingMat
+  );
+  pullRing.rotation.x = Math.PI / 2;
+  scene.add(pullRing);
+
+  return { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat };
 }
 
 export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, isPaused = false, onResume, difficulty = 'normal' }: SceneProps) {
@@ -706,6 +723,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
     renderer: THREE.WebGLRenderer;
     controls: OrbitControls;
     diskMat: THREE.ShaderMaterial;
+    pullRing: THREE.Mesh;
+    pullRingMat: THREE.MeshBasicMaterial;
   } | null>(null);
 
   useEffect(() => {
@@ -961,8 +980,8 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
     AudioManager.init();
     AudioManager.playBGM();
     const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY] || DIFFICULTY.NORMAL;
-    const { scene, camera, renderer, controls, diskMat } = createSceneObjects(gl);
-    sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat };
+    const { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat } = createSceneObjects(gl);
+    sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat };
 
     const player = new Player(0, 0, 0, scene);
     playerRef.current = player;
@@ -1004,6 +1023,8 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
 
         for (let i = bodiesRef.current.length - 1; i >= 0; i--) {
           const b = bodiesRef.current[i];
+          const pullRadius = p.mass * C.GRAVITY_PULL_SCALE;
+          b.inPullZone = b.mesh.position.distanceTo(p.pos) < pullRadius;
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
             AudioManager.playSFX('absorb');
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -1012,6 +1033,11 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               onFirstAbsorb();
             }
             p.grow(b.mass * C.MASS_ABSORB_RATIO);
+            if (sceneObjectsRef.current && sceneObjectsRef.current.pullRing) {
+              const newPullRadius = p.mass * C.GRAVITY_PULL_SCALE;
+              sceneObjectsRef.current.pullRing.geometry.dispose();
+              sceneObjectsRef.current.pullRing.geometry = new THREE.TorusGeometry(newPullRadius, 0.5, 8, 80);
+            }
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * C.BH_MASS_GROW_RATIO;
             objectsAbsorbedCountRef.current += 1;
