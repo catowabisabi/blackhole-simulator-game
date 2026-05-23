@@ -167,6 +167,13 @@ export const PULL_ZONE_EMISSIVE_STRENGTH = 0.4; // Emissive lerp factor for plan
 export const PULL_ZONE_GLOW_MIN = 0.1;         // Star glow opacity at edge of pull zone
 export const PULL_ZONE_GLOW_MAX = 0.3;         // Star glow opacity at closest proximity
 
+// Golden burst (max level celebration)
+export const GOLDEN_BURST_COLOR = 0xffd700;   // Gold color for particles
+export const GOLDEN_BURST_PARTICLE_COUNT = 40; // Number of particles in burst
+export const GOLDEN_BURST_DURATION = 1.5;     // Burst animation duration in seconds
+export const GOLDEN_BURST_RADIUS = 15;        // Initial burst radius
+export const GOLDEN_BURST_SPREAD = 50;        // How far particles travel
+
 // Disk shader
 export const DISK_SHADER_R_SCALE = 12;          // Disk plane geometry scale relative to BH_RADIUS
 export const DISK_SHADER_RINGS = 18;            // Number of rings in shader pattern

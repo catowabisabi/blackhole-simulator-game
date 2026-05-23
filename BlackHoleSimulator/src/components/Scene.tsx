@@ -822,6 +822,77 @@ function updateSpawnWarnings(warnings: SpawnWarning[], scene: THREE.Scene, curre
   }
 }
 
+interface GoldenBurst {
+  points: THREE.Points;
+  startTime: number;
+  duration: number;
+  origin: THREE.Vector3;
+  velocities: THREE.Vector3[];
+}
+
+function createGoldenBurst(scene: THREE.Scene, x: number, y: number, z: number): GoldenBurst {
+  const count = C.GOLDEN_BURST_PARTICLE_COUNT;
+  const positions = new Float32Array(count * 3);
+  const velocities: THREE.Vector3[] = [];
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = x;
+    positions[i * 3 + 1] = y;
+    positions[i * 3 + 2] = z;
+
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.random() * Math.PI;
+    const speed = 20 + Math.random() * 30;
+    velocities.push(new THREE.Vector3(
+      Math.sin(phi) * Math.cos(theta) * speed,
+      Math.sin(phi) * Math.sin(theta) * speed,
+      Math.cos(phi) * speed
+    ));
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+
+  const mat = new THREE.PointsMaterial({
+    color: C.GOLDEN_BURST_COLOR,
+    size: 3,
+    transparent: true,
+    opacity: 1.0,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    sizeAttenuation: true,
+  });
+
+  const points = new THREE.Points(geo, mat);
+  scene.add(points);
+
+  return { points, startTime: performance.now() / 1000, duration: C.GOLDEN_BURST_DURATION, origin: new THREE.Vector3(x, y, z), velocities };
+}
+
+function updateGoldenBursts(bursts: GoldenBurst[], scene: THREE.Scene, currentTime: number) {
+  for (let i = bursts.length - 1; i >= 0; i--) {
+    const b = bursts[i];
+    const age = currentTime - b.startTime;
+    if (age >= b.duration) {
+      scene.remove(b.points);
+      b.points.geometry.dispose();
+      (b.points.material as THREE.Material).dispose();
+      bursts.splice(i, 1);
+    } else {
+      const t = age / b.duration;
+      const posArr = b.points.geometry.attributes.position.array as Float32Array;
+      for (let j = 0; j < b.velocities.length; j++) {
+        const vel = b.velocities[j];
+        posArr[j * 3] += vel.x * 0.016 * (1 - t);
+        posArr[j * 3 + 1] += vel.y * 0.016 * (1 - t);
+        posArr[j * 3 + 2] += vel.z * 0.016 * (1 - t);
+      }
+      b.points.geometry.attributes.position.needsUpdate = true;
+      (b.points.material as THREE.PointsMaterial).opacity = 1.0 - t;
+    }
+  }
+}
+
 const spawnEnemyBH = useCallback((mass: number, speed: number) => {
   if (!sceneObjectsRef.current) return;
   const { camera } = sceneObjectsRef.current;
