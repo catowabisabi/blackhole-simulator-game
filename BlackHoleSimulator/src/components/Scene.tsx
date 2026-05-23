@@ -744,6 +744,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const hintFirstLevelUpRef = useRef(false);
   const hintFirstDeathRef = useRef(false);
   const spawnWarningsRef = useRef<SpawnWarning[]>([]);
+  const goldenBurstsRef = useRef<GoldenBurst[]>([]);
+  const maxLevelBurstFiredRef = useRef(false);
   const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: C.CAMERA_DIST_INITIAL, duration: C.CAMERA_ANIM_DURATION_WIN, elapsed: 0, type: 'win' });
   const ghostEchoRef = useRef<{ mesh: THREE.Mesh; glow: THREE.Sprite } | null>(null);
   const ghostFadeRef = useRef(1.0);
@@ -1174,6 +1176,11 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
           levelRef.current = newLevel;
           levelUpPendingRef.current = true;
           onLevelChange(newLevel);
+          if (newLevel === C.LEVEL_THRESHOLDS.length - 1 && !maxLevelBurstFiredRef.current) {
+            maxLevelBurstFiredRef.current = true;
+            goldenBurstsRef.current.push(createGoldenBurst(scene, p.pos.x, p.pos.y, p.pos.z));
+            if (playerRef.current) playerRef.current.growthFlash = 1.0;
+          }
         }
         if (absorbed >= C.WIN_MASS_THRESHOLD) {
           AudioManager.playSFX('win');
@@ -1263,6 +1270,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       // Update spawn warnings (visual indicator for incoming enemy BHs)
       const currentTime = performance.now() / 1000;
       updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
+      updateGoldenBursts(goldenBurstsRef.current, scene, currentTime);
 
       // Update camera animation if active
       if (cameraAnimationRef.current.active && sceneObjectsRef.current) {
