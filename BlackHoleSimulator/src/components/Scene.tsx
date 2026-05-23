@@ -910,6 +910,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const ghostEchoRef = useRef<{ mesh: THREE.Mesh; glow: THREE.Sprite } | null>(null);
   const ghostFadeRef = useRef(1.0);
   const ringPulsesRef = useRef<RingPulse[]>([]);
+  const emberRef = useRef<EmberSystem | null>(null);
   const bifurcationZoneRef = useRef(false);
   const bifurcationIntensityRef = useRef(0);
   const bifurcationSonarTimerRef = useRef(0);
@@ -1187,6 +1188,102 @@ function updateNoReturnFlashes(flashes: NoReturnFlash[], scene: THREE.Scene, cur
   }
 }
 
+interface Ember {
+  mesh: THREE.Mesh;
+  velocity: THREE.Vector3;
+  life: number;
+  maxLife: number;
+}
+
+class EmberSystem {
+  private pool: Ember[] = [];
+  private active: Ember[] = [];
+  private scene: THREE.Scene | null = null;
+  private geo: THREE.SphereGeometry;
+  private matSmall: THREE.MeshBasicMaterial;
+  private matLarge: THREE.MeshBasicMaterial;
+
+  constructor() {
+    this.geo = new THREE.SphereGeometry(1, 6, 6);
+    this.matSmall = new THREE.MeshBasicMaterial({
+      color: 0xff6600,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    this.matLarge = new THREE.MeshBasicMaterial({
+      color: 0xffaa44,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+    });
+    // Pre-allocate pool
+    for (let i = 0; i < 100; i++) {
+      const mesh = new THREE.Mesh(this.geo, this.matSmall.clone());
+      mesh.visible = false;
+      this.pool.push({ mesh, velocity: new THREE.Vector3(), life: 0, maxLife: 1 });
+    }
+  }
+
+  setScene(scene: THREE.Scene) {
+    this.scene = scene;
+    this.pool.forEach(e => scene.add(e.mesh));
+  }
+
+  spawn(position: THREE.Vector3, mass: number) {
+    if (!this.scene) return;
+    const isLarge = mass > 50;
+    const count = isLarge ? 10 + Math.floor(Math.random() * 11) : 3 + Math.floor(Math.random() * 3);
+    const mat = isLarge ? this.matLarge.clone() : this.matSmall.clone();
+    mat.color.setHex(isLarge ? 0xffaa44 : (Math.random() > 0.5 ? 0xff6600 : 0xffcc00));
+
+    for (let i = 0; i < count; i++) {
+      const ember = this.pool.find(e => !e.mesh.visible);
+      if (!ember) continue;
+
+      ember.mesh.material = mat.clone();
+      ember.mesh.position.copy(position);
+      ember.mesh.scale.setScalar(0.5 + Math.random());
+      ember.mesh.visible = true;
+
+      const theta = Math.random() * Math.PI * 2;
+      const phi = Math.random() * Math.PI;
+      const speed = 0.5 + Math.random() * 1.5;
+      ember.velocity.set(
+        Math.sin(phi) * Math.cos(theta) * speed,
+        Math.sin(phi) * Math.sin(theta) * speed,
+        Math.cos(phi) * speed
+      );
+      ember.life = 3 + Math.random() * 5;
+      ember.maxLife = ember.life;
+      this.active.push(ember);
+    }
+  }
+
+  update(delta: number) {
+    for (let i = this.active.length - 1; i >= 0; i--) {
+      const e = this.active[i];
+      e.mesh.position.addScaledVector(e.velocity, delta);
+      e.life -= delta;
+      if (e.life <= 0) {
+        e.mesh.visible = false;
+        this.active.splice(i, 1);
+      }
+    }
+  }
+
+  render() {
+    for (const e of this.active) {
+      const mat = e.mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = Math.max(0, e.life / e.maxLife);
+      const matLarge = e.mesh.material as THREE.MeshBasicMaterial;
+      if (matLarge.color.getHex() === 0xffaa44) {
+        mat.opacity *= 0.9;
+      }
+    }
+  }
+}
+
 const spawnEnemyBH = useCallback((mass: number, speed: number) => {
   if (!sceneObjectsRef.current) return;
   const { camera } = sceneObjectsRef.current;
@@ -1413,6 +1510,9 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
     const { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat, lensSphere, lensMat } = createSceneObjects(gl);
     sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat, lensSphere, lensMat };
 
+    emberRef.current = new EmberSystem();
+    emberRef.current.setScene(scene);
+
     const player = new Player(0, 0, 0, scene);
     playerRef.current = player;
 
@@ -1514,6 +1614,9 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             objectsAbsorbedCountRef.current += 1;
             ringPulsesRef.current.push(createRingPulse(scene, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z));
             noReturnFlashesRef.current.push(createNoReturnFlash(scene, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z));
+            if (emberRef.current) {
+              emberRef.current.spawn(b.mesh.position.clone(), b.mass);
+            }
             b.dispose(scene);
             bodiesRef.current.splice(i, 1);
           }
@@ -1650,6 +1753,10 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
       updateGoldenBursts(goldenBurstsRef.current, scene, currentTime);
       updateRingPulses(ringPulsesRef.current, scene, currentTime);
+      if (emberRef.current) {
+        emberRef.current.update(dt);
+        emberRef.current.render();
+      }
 
       if (bifurcationZoneRef.current && p) {
         bifurcationSonarTimerRef.current += dt;
