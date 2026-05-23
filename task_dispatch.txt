@@ -1,0 +1,17 @@
+TASK: Fix [UI] Win/Loss overlay shows playerMass instead of playerAbsorbed
+
+REPO: /mnt/c/Users/enoma/Desktop/opencode-work/agent-works/game/blackhole-simulator
+
+CONTEXT:
+- App.tsx win/loss overlay displays playerMass (BH radius) instead of playerAbsorbed (total absorbed)
+- Find gameState === won/lost JSX and fix score display to show absorbed total
+- playerAbsorbed is available via props or SaveManager.get()
+
+STEPS:
+1. Read BlackHoleSimulator/App.tsx around win/loss overlay
+2. Find where playerMass is displayed in overlay
+3. Change to show playerAbsorbed (pass as prop from Scene if needed)
+4. tsc --noEmit to verify
+
+keywords: identity, risk variance, parameter inference
+ULW
