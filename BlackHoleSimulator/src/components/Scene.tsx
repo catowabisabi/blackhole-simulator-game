@@ -163,6 +163,8 @@ class Body implements BodyInterface {
   alive: boolean = true;
   tailPts: THREE.Vector3[] = [];
   tailColor: THREE.Color;
+  tailMass: number[] = [];
+  massOpacity: number;
 
   constructor(
     x: number, y: number, z: number,
@@ -212,6 +214,10 @@ class Body implements BodyInterface {
     }
 
     this.tailColor = new THREE.Color().setHSL(Math.random(), 1, 0.6);
+    this.tailMass = [];
+    const minTrailMass = 5;
+    const maxTrailMass = 100;
+    this.massOpacity = Math.max(0.1, Math.min(0.9, (mass - minTrailMass) / (maxTrailMass - minTrailMass)));
 
     const tg = new THREE.BufferGeometry();
     const positions = new Float32Array(C.TAIL * 3);
@@ -269,8 +275,10 @@ class Body implements BodyInterface {
     }
 
     this.tailPts.push(this.mesh.position.clone());
+    this.tailMass.push(this.mass);
     if (this.tailPts.length > C.TAIL) {
       this.tailPts.shift();
+      this.tailMass.shift();
     }
 
     const n = this.tailPts.length;
@@ -282,7 +290,8 @@ class Body implements BodyInterface {
         pa[j * 3] = p.x;
         pa[j * 3 + 1] = p.y;
         pa[j * 3 + 2] = p.z;
-        aa[j] = j / (n - 1);
+        const massFactor = this.tailMass[j] / Math.max(this.mass, 1);
+        aa[j] = (j / (n - 1)) * (0.2 + 0.8 * massFactor);
       }
       this.tailGeo.attributes.position.needsUpdate = true;
       this.tailGeo.attributes.alpha.needsUpdate = true;
