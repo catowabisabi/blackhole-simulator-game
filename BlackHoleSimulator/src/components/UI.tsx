@@ -39,6 +39,8 @@ interface UIProps {
   onUpgradePurchase?: (type: 'mass' | 'speed', amount: number) => void;
   massLevel?: number;
   speedLevel?: number;
+  streakCount?: number;
+  streakMultiplier?: number;
 }
 
 export default function UI({
@@ -72,6 +74,8 @@ export default function UI({
   onUpgradePurchase,
   massLevel = 0,
   speedLevel = 0,
+  streakCount = 0,
+  streakMultiplier = 1.0,
 }: UIProps) {
   const MAX_UPGRADE_LEVEL = 5;
   const [showPayModal, setShowPayModal] = useState(false);
@@ -109,6 +113,13 @@ export default function UI({
             )}
           </View>
         </View>
+
+        {streakCount >= 2 && (
+          <View style={streakStyles.container}>
+            <Text style={streakStyles.multiplier}>×{streakMultiplier.toFixed(1)}</Text>
+            <Text style={streakStyles.counter}>COMBO ×{streakCount}</Text>
+          </View>
+        )}
 
       <View style={styles.hint}>
         <View style={styles.difficultyRow}>
@@ -1094,5 +1105,29 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontWeight: '700',
     color: '#fff',
+  },
+});
+
+const streakStyles = StyleSheet.create({
+  container: {
+    position: 'absolute',
+    top: 55,
+    right: 12,
+    alignItems: 'flex-end',
+  },
+  multiplier: {
+    fontSize: 16,
+    fontWeight: 'bold',
+    color: '#FFD700',
+    textShadowColor: '#FF8C00',
+    textShadowOffset: { width: 0, height: 0 },
+    textShadowRadius: 6,
+  },
+  counter: {
+    fontSize: 13,
+    color: '#FFF',
+    textShadowColor: '#000',
+    textShadowOffset: { width: 1, height: 1 },
+    textShadowRadius: 3,
   },
 });

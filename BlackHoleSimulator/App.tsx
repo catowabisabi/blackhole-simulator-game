@@ -16,6 +16,8 @@ interface SceneState {
   level: number;
   objectsAbsorbedCount: number;
   enemyBHKilled: number;
+  streakCount: number;
+  streakMultiplier: number;
 }
 
 export default function App() {
@@ -38,6 +40,8 @@ export default function App() {
   const [difficulty, setDifficulty] = useState<'easy' | 'normal' | 'hard'>('normal');
   const [zoomLevel, setZoomLevel] = useState(0.5);
   const [overlayOpacity, setOverlayOpacity] = useState(0);
+  const [streakCount, setStreakCount] = useState(0);
+  const [streakMultiplier, setStreakMultiplier] = useState(1.0);
   const [overlayType, setOverlayType] = useState<'win' | 'loss' | null>(null);
   const [hintText, setHintText] = useState('');
   const [showHint, setShowHint] = useState(false);
@@ -73,6 +77,13 @@ export default function App() {
     setLevel(stats.level);
     setObjectsAbsorbedCount(stats.objectsAbsorbedCount);
     setEnemyBHKilled(stats.enemyBHKilled);
+    setStreakCount(stats.streakCount);
+    setStreakMultiplier(stats.streakMultiplier);
+  }, []);
+
+  const handleStreakChange = useCallback((count: number, multiplier: number) => {
+    setStreakCount(count);
+    setStreakMultiplier(multiplier);
   }, []);
 
   const handleGameStateChange = useCallback(async (state: 'idle' | 'playing' | 'won' | 'lost') => {
@@ -225,6 +236,7 @@ export default function App() {
         onResume={handleResume}
         difficulty={difficulty}
         onPurchaseUpgrade={(fn: any) => { (window as any).__purchaseUpgrade = fn; }}
+        onStreakChange={handleStreakChange}
       />
       <UI
         bodyCount={bodyCount}
@@ -249,7 +261,7 @@ export default function App() {
         onShowStats={() => {
           Alert.alert(
             '📊 統計 / Statistics',
-            `最高分 High Score: ${highScore}\n遊戲次數 Games: ${gamesPlayed}\n最高關卡 Best Level: ${SaveManager.getData().bestLevel}`,
+            `最高分 High Score: ${highScore}\n遊戲次數 Games: ${gamesPlayed}\n最高關卡 Best Level: ${SaveManager.getData().bestLevel}\n最高連擊 Max Streak: ${SaveManager.getMaxStreak()}`,
             [{ text: '關閉 / Close' }]
           );
         }}
@@ -265,6 +277,8 @@ export default function App() {
         }}
         massLevel={massLevel}
         speedLevel={speedLevel}
+        streakCount={streakCount}
+        streakMultiplier={streakMultiplier}
       />
       {gameState !== 'idle' && (
         <View style={[styles.overlay, { 
