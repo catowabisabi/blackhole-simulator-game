@@ -69,6 +69,8 @@ interface SceneState {
   level: number;
   objectsAbsorbedCount: number;
   enemyBHKilled: number;
+  streakCount: number;
+  streakMultiplier: number;
 }
 
 interface CameraAnimation {
@@ -96,6 +98,7 @@ interface SceneProps {
   onResume?: () => void;
   difficulty?: 'easy' | 'normal' | 'hard';
   onPurchaseUpgrade?: (type: 'mass' | 'speed', amount: number) => void;
+  onStreakChange?: (count: number, multiplier: number) => void;
 }
 
 class OrbitControls {
@@ -916,6 +919,10 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const cameraShakeOffsetRef = useRef({ x: 0, y: 0 });
   const massLevelRef = useRef(0);
   const speedLevelRef = useRef(0);
+  const lastAbsorptionTimeRef = useRef(0);
+  const streakCountRef = useRef(0);
+  const streakMultiplierRef = useRef(1.0);
+  const maxStreakRef = useRef(0);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -1479,7 +1486,24 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               hintFirstAbsorbRef.current = true;
               onFirstAbsorb();
             }
-            p.grow(b.mass * C.MASS_ABSORB_RATIO);
+            const now = Date.now();
+            if (now - lastAbsorptionTimeRef.current < C.STREAK_TIMEOUT_MS) {
+              streakCountRef.current++;
+            } else {
+              streakCountRef.current = 1;
+            }
+            lastAbsorptionTimeRef.current = now;
+            if (streakCountRef.current > maxStreakRef.current) {
+              maxStreakRef.current = streakCountRef.current;
+              SaveManager.setMaxStreak(streakCountRef.current);
+            }
+            if (streakCountRef.current >= 10) streakMultiplierRef.current = C.STREAK_MULTIPLIER_10X;
+            else if (streakCountRef.current >= 5) streakMultiplierRef.current = C.STREAK_MULTIPLIER_5X;
+            else if (streakCountRef.current >= 3) streakMultiplierRef.current = C.STREAK_MULTIPLIER_3X;
+            else streakMultiplierRef.current = 1.0;
+            const actualMassGain = b.mass * C.MASS_ABSORB_RATIO * streakMultiplierRef.current;
+            p.grow(actualMassGain);
+            if (onStreakChange) onStreakChange(streakCountRef.current, streakMultiplierRef.current);
             if (sceneObjectsRef.current && sceneObjectsRef.current.pullRing) {
               const newPullRadius = p.mass * C.GRAVITY_PULL_SCALE;
               sceneObjectsRef.current.pullRing.geometry.dispose();
@@ -1574,7 +1598,9 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
               onGameStateChange('lost');
               cameraAnimationRef.current = { active: true, targetDist: C.CAMERA_TARGET_DIST_LOSS, duration: C.CAMERA_ANIM_DURATION_LOSS, elapsed: 0, type: 'loss' };
               p.alive = false;
-              // Ghost echo — save player's largest moment as fading silhouette
+              streakCountRef.current = 0;
+              streakMultiplierRef.current = 1.0;
+              if (onStreakChange) onStreakChange(0, 1.0);
               if (p && p.mesh) {
                 const ghostMat = new THREE.MeshBasicMaterial({
                   color: 0x333333,
@@ -1615,6 +1641,8 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
         level: levelRef.current,
         objectsAbsorbedCount: objectsAbsorbedCountRef.current,
         enemyBHKilled: enemyBHKilledRef.current,
+        streakCount: streakCountRef.current,
+        streakMultiplier: streakMultiplierRef.current,
       });
 
       // Update spawn warnings (visual indicator for incoming enemy BHs)

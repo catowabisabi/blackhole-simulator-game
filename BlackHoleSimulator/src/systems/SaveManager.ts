@@ -9,6 +9,7 @@ interface SavedData {
   shownHints: string[];
   massLevel: number;
   speedLevel: number;
+  maxStreak: number;
 }
 
 const SAVE_KEY = '@blackhole_save';
@@ -22,6 +23,7 @@ const defaultData: SavedData = {
   shownHints: [],
   massLevel: 0,
   speedLevel: 0,
+  maxStreak: 0,
 };
 
 class SaveManagerClass {
@@ -98,6 +100,17 @@ class SaveManagerClass {
 
   getUpgradeLevel(type: 'mass' | 'speed'): number {
     return type === 'mass' ? this.data.massLevel : this.data.speedLevel;
+  }
+
+  getMaxStreak(): number {
+    return this.data.maxStreak || 0;
+  }
+
+  async setMaxStreak(s: number): Promise<void> {
+    if (s > this.data.maxStreak) {
+      this.data.maxStreak = s;
+      await this.save();
+    }
   }
 }
 

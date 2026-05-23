@@ -260,6 +260,15 @@ export const MIN_DISTANCE = 0.1;                // Minimum distance for velocity
 export const MIN_BH_DISTANCE = 1;              // Minimum BH distance for gravity calc
 export const MIN_BODY_DISTANCE = 10;           // Minimum body distance for gravity calc
 
+// ============================================================================
+// STREAK / COMBO SYSTEM
+// ============================================================================
+export const STREAK_TIMEOUT_MS = 3000;
+export const STREAK_MULTIPLIER_3X = 1.5;
+export const STREAK_MULTIPLIER_5X = 2.0;
+export const STREAK_MULTIPLIER_10X = 3.0;
+export const STREAK_MIN_DISPLAY = 2;
+
 // BIFURCATION
 export const BIFURCATION_ZONE_RATIO = 0.9;
 export const BIFURCATION_SHAKE_INTENSITY = 0.05;
