@@ -810,7 +810,40 @@ function createSceneObjects(gl: any) {
   pullRing.rotation.x = Math.PI / 2;
   scene.add(pullRing);
 
-  return { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat };
+  const lensMat = new THREE.ShaderMaterial({
+    uniforms: { time: { value: 0 } },
+    vertexShader: `
+      varying vec2 vUv;
+      void main() {
+        vUv = uv;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      uniform float time;
+      varying vec2 vUv;
+      void main() {
+        vec2 center = vec2(0.5, 0.5);
+        vec2 delta = vUv - center;
+        float dist = length(delta);
+        float strength = 0.15;
+        float falloff = pow(max(0.0, 1.0 - dist * 1.5), 2.0);
+        vec2 offset = normalize(delta + 0.001) * falloff * strength;
+        vec2 warpedUv = vUv + offset;
+        float ring = smoothstep(0.0, 0.02, abs(dist - 0.3)) * 0.15;
+        gl_FragColor = vec4(0.7, 0.8, 1.0, ring + falloff * 0.05);
+      }
+    `,
+    transparent: true,
+    blending: THREE.AdditiveBlending,
+    depthWrite: false,
+    side: THREE.DoubleSide,
+  });
+  const lensSphere = new THREE.Mesh(new THREE.SphereGeometry(C.BH_RADIUS * 4, 32, 32), lensMat);
+  lensSphere.rotation.x = Math.PI / 2;
+  scene.add(lensSphere);
+
+  return { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat, lensSphere, lensMat };
 }
 
 export default function Scene({ simSpeed, trailColor, onStatsChange, onGameStateChange, onPlayerPosChange, onLevelChange, onZoomLevelChange, onOverlayOpacityChange, onFirstAbsorb, onFirstEnemyEncounter, onFirstLevelUp, onFirstDeath, isPaused = false, onResume, difficulty = 'normal', onPurchaseUpgrade }: SceneProps) {
@@ -857,6 +890,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
     diskMat: THREE.ShaderMaterial;
     pullRing: THREE.Mesh;
     pullRingMat: THREE.MeshBasicMaterial;
+    lensSphere: THREE.Mesh;
+    lensMat: THREE.ShaderMaterial;
   } | null>(null);
 
   useEffect(() => {
@@ -1307,8 +1342,8 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
     AudioManager.init();
     AudioManager.playBGM();
     const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY] || DIFFICULTY.NORMAL;
-    const { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat } = createSceneObjects(gl);
-    sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat };
+    const { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat, lensSphere, lensMat } = createSceneObjects(gl);
+    sceneObjectsRef.current = { scene, camera, renderer, controls, diskMat, pullRing, pullRingMat, lensSphere, lensMat };
 
     const player = new Player(0, 0, 0, scene);
     playerRef.current = player;
@@ -1325,9 +1360,11 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
       if (isPaused) return;
       t += C.FRAME_TIME;
       diskMat.uniforms.time.value = t;
+      lensMat.uniforms.time.value = t;
       if (playerRef.current) {
         diskMat.uniforms.growthFlash.value = playerRef.current.growthFlash;
         playerRef.current.growthFlash = Math.max(0, playerRef.current.growthFlash - C.GROWTH_FLASH_DECAY);
+        lensSphere.position.set(playerRef.current.pos.x, 0, playerRef.current.pos.z);
       }
 
       scene.children.forEach((c: any) => {

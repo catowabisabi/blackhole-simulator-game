@@ -8,6 +8,7 @@
 // ============================================================================
 export const BH_MASS = 12000;                    // Central black hole mass
 export const BH_RADIUS = 22;                    // Central black hole visual radius
+export const LENS_DISTORTION_STRENGTH = 0.15;  // Gravitational lens UV distortion strength
 export const G = 14;                             // Gravitational constant
 export const PLAYER_INITIAL_MASS = 40;          // Player starting mass
 export const PLAYER_INITIAL_RADIUS = 8;         // Player starting radius
