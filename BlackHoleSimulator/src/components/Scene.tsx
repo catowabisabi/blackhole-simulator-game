@@ -170,6 +170,7 @@ class Body implements BodyInterface {
   massOpacity: number;
   inPullZone: boolean = false;
   wasInPullZone: boolean = false;
+  wasInTidalZone: boolean = false;
   originalColor: number;
   originalEmissive: THREE.Color | null = null;
 
@@ -329,6 +330,26 @@ class Body implements BodyInterface {
       const glowMat = this.glow.material as THREE.SpriteMaterial;
       glowMat.opacity = C.STAR_GLOW_OPACITY_START;
     }
+    if (this.originalEmissive) {
+      mat.emissive.copy(this.originalEmissive);
+    }
+  }
+
+  applyTidalTint(intensity: number) {
+    // Tint body color toward orange-red when in tidal range
+    const mat = this.mesh.material as THREE.MeshPhongMaterial;
+    const tidalColor = new THREE.Color(C.TIDAL_COLOR);
+    const currentColor = new THREE.Color(this.originalColor);
+    const targetColor = currentColor.lerp(tidalColor, intensity * 0.6);
+    mat.color.copy(targetColor);
+    if (this.originalEmissive) {
+      mat.emissive.lerp(tidalColor, intensity * 0.5);
+    }
+  }
+
+  clearTidalTint() {
+    const mat = this.mesh.material as THREE.MeshPhongMaterial;
+    mat.color.setHex(this.originalColor);
     if (this.originalEmissive) {
       mat.emissive.copy(this.originalEmissive);
     }
@@ -1397,6 +1418,20 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             b.clearPullZoneTint();
           }
           b.wasInPullZone = b.inPullZone;
+          // Tidal disruption stretch effect: bodies near player BH stretch toward it
+          const tidalRange = p.radius * C.TIDAL_STRETCH_MAX_DISTANCE;
+          const bodyDist = b.mesh.position.distanceTo(p.pos);
+          if (bodyDist < tidalRange && bodyDist > 0) {
+            const stretchFactor = 1.0 + (1.0 - bodyDist / tidalRange) * C.TIDAL_STRETCH_INTENSITY;
+            // Stretch along the axis toward the player BH (X axis for simplicity)
+            b.mesh.scale.set(stretchFactor, 1, 1);
+            // Color shift toward tidal orange-red
+            b.applyTidalTint(1.0 - bodyDist / tidalRange);
+          } else {
+            b.mesh.scale.set(1, 1, 1);
+            if (b.wasInTidalZone) b.clearTidalTint();
+          }
+          b.wasInTidalZone = bodyDist < tidalRange;
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
             AudioManager.playSFX('absorb');
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

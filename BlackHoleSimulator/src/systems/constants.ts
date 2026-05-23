@@ -172,6 +172,11 @@ export const PULL_ZONE_EMISSIVE_STRENGTH = 0.4;
 export const PULL_ZONE_GLOW_MIN = 0.1;
 export const PULL_ZONE_GLOW_MAX = 0.3;
 
+// Tidal disruption visual effect
+export const TIDAL_STRETCH_MAX_DISTANCE = 4.0;  // multiplier of playerRadius for tidal range
+export const TIDAL_STRETCH_INTENSITY = 1.2;     // max stretch factor
+export const TIDAL_COLOR = 0xff4422;            // orange-red tidal color
+
 // Golden burst (max level celebration)
 export const GOLDEN_BURST_COLOR = 0xffd700;   // Gold color for particles
 export const GOLDEN_BURST_PARTICLE_COUNT = 40; // Number of particles in burst
