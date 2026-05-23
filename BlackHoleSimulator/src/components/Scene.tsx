@@ -166,6 +166,9 @@ class Body implements BodyInterface {
   tailMass: number[] = [];
   massOpacity: number;
   inPullZone: boolean = false;
+  wasInPullZone: boolean = false;
+  originalColor: number;
+  originalEmissive: THREE.Color | null = null;
 
   constructor(
     x: number, y: number, z: number,
@@ -212,6 +215,11 @@ class Body implements BodyInterface {
     if (glowSprite) {
       this.glow = glowSprite;
       this.mesh.add(this.glow);
+    }
+
+    this.originalColor = color;
+    if (type !== 'star') {
+      this.originalEmissive = new THREE.Color((mat as THREE.MeshPhongMaterial).emissive.getHex());
     }
 
     this.tailColor = new THREE.Color().setHSL(Math.random(), 1, 0.6);
@@ -297,6 +305,29 @@ class Body implements BodyInterface {
       this.tailGeo.attributes.position.needsUpdate = true;
       this.tailGeo.attributes.alpha.needsUpdate = true;
       this.tailGeo.setDrawRange(0, n);
+    }
+  }
+
+  applyPullZoneTint(proximityFactor: number) {
+    const mat = this.mesh.material as THREE.MeshPhongMaterial;
+    if (this.type === 'star' && this.glow) {
+      const glowMat = this.glow.material as THREE.SpriteMaterial;
+      const targetOpacity = C.PULL_ZONE_GLOW_MIN + proximityFactor * (C.PULL_ZONE_GLOW_MAX - C.PULL_ZONE_GLOW_MIN);
+      glowMat.opacity = Math.min(C.PULL_ZONE_GLOW_MAX, Math.max(C.PULL_ZONE_GLOW_MIN, targetOpacity));
+    } else if (this.originalEmissive) {
+      const orangeColor = new THREE.Color(C.PULL_ZONE_TINT);
+      mat.emissive.lerp(orangeColor, proximityFactor * C.PULL_ZONE_EMISSIVE_STRENGTH);
+    }
+  }
+
+  clearPullZoneTint() {
+    const mat = this.mesh.material as THREE.MeshPhongMaterial;
+    if (this.type === 'star' && this.glow) {
+      const glowMat = this.glow.material as THREE.SpriteMaterial;
+      glowMat.opacity = C.STAR_GLOW_OPACITY_START;
+    }
+    if (this.originalEmissive) {
+      mat.emissive.copy(this.originalEmissive);
     }
   }
 
@@ -1025,6 +1056,14 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
           const b = bodiesRef.current[i];
           const pullRadius = p.mass * C.GRAVITY_PULL_SCALE;
           b.inPullZone = b.mesh.position.distanceTo(p.pos) < pullRadius;
+          if (b.inPullZone) {
+            const dist = b.mesh.position.distanceTo(p.pos);
+            const proximityFactor = 1 - Math.max(0, Math.min(1, (dist - b.radius) / (pullRadius - b.radius)));
+            b.applyPullZoneTint(proximityFactor);
+          } else if (b.wasInPullZone) {
+            b.clearPullZoneTint();
+          }
+          b.wasInPullZone = b.inPullZone;
           if (b.mesh.position.distanceTo(p.pos) < p.radius + b.radius) {
             AudioManager.playSFX('absorb');
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);

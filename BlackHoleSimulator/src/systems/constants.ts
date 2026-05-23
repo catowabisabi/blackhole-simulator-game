@@ -161,6 +161,12 @@ export const RING_ROTATION_SPEED_BASE = 0.008;          // Base ring rotation sp
 export const PLAYER_GLOW_OPACITY = 0.4;        // Player glow sprite opacity
 export const PLAYER_GLOW_SCALE = 5;            // Player glow scale multiplier
 
+// Pull zone visual tint
+export const PULL_ZONE_TINT = 0xff6622;       // Warm orange tint for bodies in pull zone
+export const PULL_ZONE_EMISSIVE_STRENGTH = 0.4; // Emissive lerp factor for planets (0-1)
+export const PULL_ZONE_GLOW_MIN = 0.1;         // Star glow opacity at edge of pull zone
+export const PULL_ZONE_GLOW_MAX = 0.3;         // Star glow opacity at closest proximity
+
 // Disk shader
 export const DISK_SHADER_R_SCALE = 12;          // Disk plane geometry scale relative to BH_RADIUS
 export const DISK_SHADER_RINGS = 18;            // Number of rings in shader pattern
