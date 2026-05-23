@@ -1,20 +1,48 @@
-TASK: Fix [UI] Mass upgrade purchase pulse feedback
+TASK: Fix [Shader] Bifurcation indicator - pre-level transition visual shift
 
 REPO: /mnt/c/Users/enoma/Desktop/opencode-work/agent-works/game/blackhole-simulator
 
 CONTEXT:
-- When player buys an upgrade (mass, speed, etc.), there is no visual feedback confirming purchase worked
-- Need to add: (1) brief pulse animation on player BH, (2) floating "+N MASS" / "+SPEED" indicator
-- This is the only remaining pending TODO from the painpoint list
+- #29 from todo list, priority 7, status new, source concept:#18
+- Concept: at level thresholds (bifurcation points), game world subtly shifts to build anticipation
+- LEVEL_THRESHOLDS = [0, 10000, 25000, 45000, 75000, 120000]
+- Need to detect when player absorbed mass is within 90% of next LEVEL_THRESHOLD
 
 STEPS:
-1. Read BlackHoleSimulator/App.tsx to find the upgrade purchase buttons (look for upgrade-related onPress handlers)
-2. Read BlackHoleSimulator/src/components/Scene.tsx around the player BH (Player class, grow() method) to understand how to trigger pulse
-3. Add a visual pulse effect on the player BH when upgrade is purchased:
-   - In Player class (Scene.tsx), add a purchasePulse property and animate it in the render loop
-   - OR add a floating text indicator mesh that appears and fades
-4. Wire the upgrade purchase in App.tsx to call into Scene's player reference and trigger the pulse
-5. tsc --noEmit to verify, fix any TypeScript errors
+1. Read BlackHoleSimulator/src/systems/constants.ts to confirm LEVEL_THRESHOLDS values
+2. Read BlackHoleSimulator/src/components/Scene.tsx around lines 1304-1330 (level detection logic) and lines 1419-1436 (camera animation section)
+3. Add bifurcation detection and effects:
 
-keywords: breach, source attribution, thickening
+   A. BIFURCATION ZONE DETECTION (in game loop around line 1304):
+      - After computing newLevel, check if player is in "bifurcation zone" (within 90% of next LEVEL_THRESHOLD)
+      - Example: if next threshold is 10000 and player has >= 9000, bifurcation zone is active
+      - Add refs: bifurcationZoneRef (boolean), bifurcationIntensityRef (0-1)
+
+   B. CAMERA SHAKE (in render loop around line 1420):
+      - When bifurcationZoneRef is true, add small random jitter to camera position
+      - displacement = sin(time * 30) * 0.05 * bifurcationIntensityRef
+      - When approaching threshold: intensity ramps from 0 to 1 as player gets closer
+      - Reset to 0 when bifurcation zone exits
+
+   C. SONAR PULSE RING (in game loop, separate from ringPulse):
+      - Create a new createBifurcationPulse() function similar to createRingPulse() but:
+        - Centered on player position, not absorbed object
+        - Larger radius (player radius * 3), expands to 8x
+        - Color: deep violet to pale blue gradient
+        - Triggered every 2 seconds while in bifurcation zone
+        - On actual level-up: burst = fast expanding ring + brief screen flash
+
+   D. LEVEL-UP BURST EFFECT:
+      - In the existing level-up code (line 1312), add a burstRing animation
+      - When newLevel > levelRef.current, trigger goldenBurstRef + screen flash
+
+   E. CONSTANTS in constants.ts:
+      - BIFURCATION_ZONE_RATIO = 0.9 (90% of threshold triggers zone)
+      - BIFURCATION_SHAKE_INTENSITY = 0.05
+      - BIFURCATION_SONAR_INTERVAL = 2.0 (seconds between sonar pulses)
+      - BIFURCATION_STAR_DENSITY_MULT = 1.5
+
+4. tsc --noEmit to verify, fix any TypeScript errors
+
+keywords: significance, text-completion-placeholder, context
 ULW

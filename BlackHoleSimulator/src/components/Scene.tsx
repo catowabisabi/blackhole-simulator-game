@@ -841,6 +841,12 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const ghostEchoRef = useRef<{ mesh: THREE.Mesh; glow: THREE.Sprite } | null>(null);
   const ghostFadeRef = useRef(1.0);
   const ringPulsesRef = useRef<RingPulse[]>([]);
+  const bifurcationZoneRef = useRef(false);
+  const bifurcationIntensityRef = useRef(0);
+  const bifurcationSonarTimerRef = useRef(0);
+  const bifurcationPulsesRef = useRef<BifurcationPulse[]>([]);
+  const levelUpFlashRef = useRef(0);
+  const cameraShakeOffsetRef = useRef({ x: 0, y: 0 });
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -1025,6 +1031,53 @@ function updateRingPulses(pulses: RingPulse[], scene: THREE.Scene, currentTime: 
       mat.opacity = C.RING_PULSE_OPACITY_START * (1 - t);
       const scale = C.RING_PULSE_SCALE_START + t * (C.RING_PULSE_SCALE_END - C.RING_PULSE_SCALE_START);
       p.mesh.scale.setScalar(scale);
+    }
+  }
+}
+
+interface BifurcationPulse {
+  mesh: THREE.Mesh;
+  startTime: number;
+  duration: number;
+}
+
+function createBifurcationPulse(scene: THREE.Scene, x: number, y: number, z: number, playerRadius: number): BifurcationPulse {
+  const startRadius = playerRadius * C.BIFURCATION_SONAR_START_RADIUS;
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(startRadius, 0.4, 8, 64),
+    new THREE.MeshBasicMaterial({
+      color: C.BIFURCATION_SONAR_COLOR,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  ring.position.set(x, y, z);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+  return { mesh: ring, startTime: performance.now() / 1000, duration: C.BIFURCATION_PULSE_DURATION };
+}
+
+function updateBifurcationPulses(pulses: BifurcationPulse[], scene: THREE.Scene, currentTime: number, playerRadius: number) {
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    const age = currentTime - p.startTime;
+    if (age >= p.duration) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      (p.mesh.material as THREE.Material).dispose();
+      pulses.splice(i, 1);
+    } else {
+      const t = age / p.duration;
+      const mat = p.mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = 0.8 * (1 - t);
+      const startRadius = playerRadius * C.BIFURCATION_SONAR_START_RADIUS;
+      const endRadius = startRadius * C.BIFURCATION_SONAR_END_SCALE;
+      const scale = startRadius + t * (endRadius - startRadius);
+      p.mesh.scale.setScalar(scale);
+      const color = new THREE.Color(C.BIFURCATION_SONAR_COLOR).lerp(new THREE.Color(C.BIFURCATION_SONAR_END_COLOR), t);
+      mat.color = color;
     }
   }
 }
@@ -1309,6 +1362,18 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             break;
           }
         }
+
+        const nextThreshold = C.LEVEL_THRESHOLDS[levelRef.current + 1];
+        if (nextThreshold !== undefined && absorbed >= nextThreshold * C.BIFURCATION_ZONE_RATIO) {
+          bifurcationZoneRef.current = true;
+          const distanceToThreshold = nextThreshold - absorbed;
+          const thresholdRange = nextThreshold * (1 - C.BIFURCATION_ZONE_RATIO);
+          bifurcationIntensityRef.current = Math.min(1, Math.max(0, 1 - distanceToThreshold / thresholdRange));
+        } else {
+          bifurcationZoneRef.current = false;
+          bifurcationIntensityRef.current = 0;
+        }
+
         if (newLevel > levelRef.current) {
           AudioManager.playSFX('levelup');
           Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1324,6 +1389,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             goldenBurstsRef.current.push(createGoldenBurst(scene, p.pos.x, p.pos.y, p.pos.z));
             if (playerRef.current) playerRef.current.growthFlash = 1.0;
           }
+          levelUpFlashRef.current = 1.0;
         }
         if (absorbed >= C.WIN_MASS_THRESHOLD) {
           AudioManager.playSFX('win');
@@ -1415,6 +1481,32 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
       updateGoldenBursts(goldenBurstsRef.current, scene, currentTime);
       updateRingPulses(ringPulsesRef.current, scene, currentTime);
+
+      if (bifurcationZoneRef.current && p) {
+        bifurcationSonarTimerRef.current += dt;
+        if (bifurcationSonarTimerRef.current >= C.BIFURCATION_SONAR_INTERVAL) {
+          bifurcationPulsesRef.current.push(createBifurcationPulse(scene, p.pos.x, p.pos.y, p.pos.z, p.radius));
+          bifurcationSonarTimerRef.current = 0;
+        }
+      }
+      updateBifurcationPulses(bifurcationPulsesRef.current, scene, currentTime, p ? p.radius : 8);
+
+      if (bifurcationZoneRef.current && sceneObjectsRef.current) {
+        const shake = Math.sin(performance.now() * 0.03) * C.BIFURCATION_SHAKE_INTENSITY * bifurcationIntensityRef.current;
+        cameraShakeOffsetRef.current.x += shake;
+        cameraShakeOffsetRef.current.y += shake * 0.5;
+      }
+
+      if (cameraShakeOffsetRef.current.x !== 0 || cameraShakeOffsetRef.current.y !== 0) {
+        sceneObjectsRef.current.camera.position.x += cameraShakeOffsetRef.current.x;
+        sceneObjectsRef.current.camera.position.y += cameraShakeOffsetRef.current.y;
+        cameraShakeOffsetRef.current.x = 0;
+        cameraShakeOffsetRef.current.y = 0;
+      }
+
+      if (levelUpFlashRef.current > 0) {
+        levelUpFlashRef.current -= dt * 3;
+      }
 
       // Update camera animation if active
       if (cameraAnimationRef.current.active && sceneObjectsRef.current) {

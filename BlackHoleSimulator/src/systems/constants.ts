@@ -251,3 +251,15 @@ export const SPAWN_WARNING_ROTATION_SPEED = 0.05; // Warning ring rotation speed
 export const MIN_DISTANCE = 0.1;                // Minimum distance for velocity calculations
 export const MIN_BH_DISTANCE = 1;              // Minimum BH distance for gravity calc
 export const MIN_BODY_DISTANCE = 10;           // Minimum body distance for gravity calc
+
+// BIFURCATION
+export const BIFURCATION_ZONE_RATIO = 0.9;
+export const BIFURCATION_SHAKE_INTENSITY = 0.05;
+export const BIFURCATION_SONAR_INTERVAL = 2.0;
+export const BIFURCATION_STAR_DENSITY_MULT = 1.5;
+export const BIFURCATION_SONAR_START_RADIUS = 3;
+export const BIFURCATION_SONAR_END_SCALE = 8;
+export const BIFURCATION_SONAR_COLOR = 0x8844ff;
+export const BIFURCATION_SONAR_END_COLOR = 0x44aaff;
+export const BIFURCATION_PULSE_DURATION = 1.5;
+export const LEVEL_UP_FLASH_DURATION = 0.3;
