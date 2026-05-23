@@ -300,9 +300,21 @@ class Body implements BodyInterface {
       const aa = this.tailGeo.attributes.alpha.array as Float32Array;
       for (let j = 0; j < n; j++) {
         const p = this.tailPts[j];
-        pa[j * 3] = p.x;
-        pa[j * 3 + 1] = p.y;
-        pa[j * 3 + 2] = p.z;
+        // Brownian jitter for entropic decay: older points (low alpha) drift apart
+        let jitterX = 0, jitterY = 0, jitterZ = 0;
+        const alpha = aa[j];
+        if (alpha < C.TAIL_DECAY_START && alpha > 0) {
+          const decayIntensity = 1.0 - alpha / C.TAIL_DECAY_START;
+          const jitterMag = decayIntensity * C.TAIL_MAX_JITTER;
+          // Per-point random seed based on index + body id for consistency
+          const seed = (j * 17 + Math.round(this.mesh.id)) % 1000;
+          jitterX = ((seed * 0.381 % 1) * 2 - 1) * jitterMag;
+          jitterY = ((seed * 0.618 % 1) * 2 - 1) * jitterMag;
+          jitterZ = (((seed * 0.145) % 1) * 2 - 1) * jitterMag;
+        }
+        pa[j * 3] = p.x + jitterX;
+        pa[j * 3 + 1] = p.y + jitterY;
+        pa[j * 3 + 2] = p.z + jitterZ;
         const massFactor = this.tailMass[j] / Math.max(this.mass, 1);
         aa[j] = (j / (n - 1)) * (0.2 + 0.8 * massFactor);
       }

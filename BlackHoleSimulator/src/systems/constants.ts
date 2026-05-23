@@ -122,6 +122,8 @@ export const SPAWN_COMET_Z_RANGE = 350;        // Comet Z spawn range
 // RENDERING / VISUALS
 // ============================================================================
 export const TAIL = 80;                         // Trail point count
+export const TAIL_DECAY_START = 0.5;           // Start brownian jitter when alpha < this
+export const TAIL_MAX_JITTER = 0.5;            // Max brownian displacement (world units)
 
 // Star visuals
 export const STAR_GLOW_INTENSITY = 8;
