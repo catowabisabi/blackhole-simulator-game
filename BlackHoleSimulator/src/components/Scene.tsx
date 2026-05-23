@@ -749,6 +749,7 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const cameraAnimationRef = useRef<CameraAnimation>({ active: false, targetDist: C.CAMERA_DIST_INITIAL, duration: C.CAMERA_ANIM_DURATION_WIN, elapsed: 0, type: 'win' });
   const ghostEchoRef = useRef<{ mesh: THREE.Mesh; glow: THREE.Sprite } | null>(null);
   const ghostFadeRef = useRef(1.0);
+  const ringPulsesRef = useRef<RingPulse[]>([]);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -891,6 +892,48 @@ function updateGoldenBursts(bursts: GoldenBurst[], scene: THREE.Scene, currentTi
       }
       b.points.geometry.attributes.position.needsUpdate = true;
       (b.points.material as THREE.PointsMaterial).opacity = 1.0 - t;
+    }
+  }
+}
+
+interface RingPulse {
+  mesh: THREE.Mesh;
+  startTime: number;
+  duration: number;
+}
+
+function createRingPulse(scene: THREE.Scene, x: number, y: number, z: number): RingPulse {
+  const ring = new THREE.Mesh(
+    new THREE.TorusGeometry(1, 0.3, 8, 64),
+    new THREE.MeshBasicMaterial({
+      color: C.RING_PULSE_COLOR,
+      transparent: true,
+      opacity: C.RING_PULSE_OPACITY_START,
+      blending: THREE.AdditiveBlending,
+      side: THREE.DoubleSide,
+    })
+  );
+  ring.position.set(x, y, z);
+  ring.rotation.x = Math.PI / 2;
+  scene.add(ring);
+  return { mesh: ring, startTime: performance.now() / 1000, duration: C.RING_PULSE_DURATION };
+}
+
+function updateRingPulses(pulses: RingPulse[], scene: THREE.Scene, currentTime: number) {
+  for (let i = pulses.length - 1; i >= 0; i--) {
+    const p = pulses[i];
+    const age = currentTime - p.startTime;
+    if (age >= p.duration) {
+      scene.remove(p.mesh);
+      p.mesh.geometry.dispose();
+      (p.mesh.material as THREE.Material).dispose();
+      pulses.splice(i, 1);
+    } else {
+      const t = age / p.duration;
+      const mat = p.mesh.material as THREE.MeshBasicMaterial;
+      mat.opacity = C.RING_PULSE_OPACITY_START * (1 - t);
+      const scale = C.RING_PULSE_SCALE_START + t * (C.RING_PULSE_SCALE_END - C.RING_PULSE_SCALE_START);
+      p.mesh.scale.setScalar(scale);
     }
   }
 }
@@ -1153,6 +1196,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
             scoreRef.current += Math.round(b.mass);
             bhMassRef.current += b.mass * C.BH_MASS_GROW_RATIO;
             objectsAbsorbedCountRef.current += 1;
+            ringPulsesRef.current.push(createRingPulse(scene, b.mesh.position.x, b.mesh.position.y, b.mesh.position.z));
             b.dispose(scene);
             bodiesRef.current.splice(i, 1);
           }
@@ -1271,6 +1315,7 @@ const diffMult = DIFFICULTY[difficulty.toUpperCase() as keyof typeof DIFFICULTY]
       const currentTime = performance.now() / 1000;
       updateSpawnWarnings(spawnWarningsRef.current, scene, currentTime);
       updateGoldenBursts(goldenBurstsRef.current, scene, currentTime);
+      updateRingPulses(ringPulsesRef.current, scene, currentTime);
 
       // Update camera animation if active
       if (cameraAnimationRef.current.active && sceneObjectsRef.current) {
