@@ -914,6 +914,8 @@ export default function Scene({ simSpeed, trailColor, onStatsChange, onGameState
   const levelUpFlashRef = useRef(0);
   const noReturnFlashesRef = useRef<NoReturnFlash[]>([]);
   const cameraShakeOffsetRef = useRef({ x: 0, y: 0 });
+  const massLevelRef = useRef(0);
+  const speedLevelRef = useRef(0);
 
   const sceneObjectsRef = useRef<{
     scene: THREE.Scene;
@@ -1366,10 +1368,36 @@ spawnEnemyBH(C.LEVEL_ENEMY_MASS[1], C.LEVEL_ENEMY_SPEED[1]);
   // Handle upgrade purchase callbacks to trigger visual feedback
   useEffect(() => {
     if (!onPurchaseUpgrade || !playerRef.current) return;
-    (window as any).__purchaseUpgrade = (type: 'mass' | 'speed', amount: number) => {
+    (window as any).__purchaseUpgrade = async (type: 'mass' | 'speed', amount: number) => {
       playerRef.current?.triggerPurchasePulse(type, amount);
+      
+      // Update upgrade level
+      const levelRef = type === 'mass' ? massLevelRef : speedLevelRef;
+      const newLevel = levelRef.current + 1;
+      levelRef.current = newLevel;
+      
+      // Persist the upgrade level
+      await SaveManager.setUpgradeLevel(type, newLevel);
+      
+      // Check for max level celebration
+      if (newLevel >= C.MAX_UPGRADE_LEVEL) {
+        const scene = sceneObjectsRef.current?.scene;
+        if (scene && playerRef.current) {
+          goldenBurstsRef.current.push(createGoldenBurst(scene, playerRef.current.pos.x, playerRef.current.pos.y, playerRef.current.pos.z));
+          playerRef.current.growthFlash = 1.0;
+          Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        }
+      }
     };
   }, [onPurchaseUpgrade]);
+
+  // Load saved upgrade levels on mount
+  useEffect(() => {
+    const savedMassLevel = SaveManager.getUpgradeLevel('mass');
+    const savedSpeedLevel = SaveManager.getUpgradeLevel('speed');
+    massLevelRef.current = savedMassLevel;
+    speedLevelRef.current = savedSpeedLevel;
+  }, []);
 
   const onContextCreate = useCallback((gl: any) => {
     AudioManager.init();

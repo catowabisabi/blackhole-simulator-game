@@ -7,6 +7,8 @@ interface SavedData {
   totalMassAbsorbed: number;
   difficulty: string;
   shownHints: string[];
+  massLevel: number;
+  speedLevel: number;
 }
 
 const SAVE_KEY = '@blackhole_save';
@@ -18,6 +20,8 @@ const defaultData: SavedData = {
   totalMassAbsorbed: 0,
   difficulty: 'normal',
   shownHints: [],
+  massLevel: 0,
+  speedLevel: 0,
 };
 
 class SaveManagerClass {
@@ -81,6 +85,19 @@ class SaveManagerClass {
       this.data.shownHints.push(hintId);
       await this.save();
     }
+  }
+
+  async setUpgradeLevel(type: 'mass' | 'speed', level: number) {
+    if (type === 'mass') {
+      this.data.massLevel = level;
+    } else {
+      this.data.speedLevel = level;
+    }
+    await this.save();
+  }
+
+  getUpgradeLevel(type: 'mass' | 'speed'): number {
+    return type === 'mass' ? this.data.massLevel : this.data.speedLevel;
   }
 }
 

@@ -274,3 +274,6 @@ export const LEVEL_UP_FLASH_DURATION = 0.3;
 export const POINT_OF_NO_RETURN_FLASH_DURATION = 0.15;
 export const POINT_OF_NO_RETURN_FLASH_INTENSITY = 2.0;
 export const POINT_OF_NO_RETURN_FLASH_COLOR = 0xffffff;
+
+// Max upgrade level for both mass and speed upgrades
+export const MAX_UPGRADE_LEVEL = 5;

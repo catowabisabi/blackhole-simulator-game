@@ -1,34 +1,40 @@
-TASK: Implement gravitational lens distortion shader in Scene.tsx
+TASK: Add upgrade max-level tracking + golden celebration effect
 
-Concept #19: Render real-time UV distortion around player BH - objects and background warp near event horizon using shader displacement based on distance to BH center.
+Idea #8: Golden glow + checkmark MASTERED effect for maxed upgrades in shop
+
+Concept #12: Golden maxed effect: when upgrade reaches max level, add golden glow + brief particle burst. Shows player they have achieved the best version of that upgrade.
 
 CONTEXT:
-- Player BH is rendered as diskMesh with diskMat ShaderMaterial (line ~793 in Scene.tsx)
-- diskMat uniforms: { time, growthFlash }
-- diskMesh is a PlaneGeometry positioned at Y=0
+- Upgrade buttons in BlackHoleSimulator/src/components/UI.tsx (mass + speed upgrades)
+- Player state tracked in BlackHoleSimulator/src/components/Scene.tsx
+- Golden particle burst system already exists: createGoldenBurst() + goldenBurstsRef
+- SaveManager in BlackHoleSimulator/src/systems/SaveManager.ts handles persistence
 
 STEPS:
-1. Read BlackHoleSimulator/src/components/Scene.tsx lines 760-815 (diskMat shader) and lines 1300-1340 (player mesh setup)
+1. Read UI.tsx: find upgrade buttons (mass + speed), find how upgrades are triggered (onUpgradePurchase callback)
 
-2. Create gravitational lens as a SPHERE mesh around the player BH:
-   - Create lensSphere: new THREE.Mesh(new THREE.SphereGeometry(playerRadius * 2, 32, 32), lensMat)
-   - Position at player position
-   - Use ShaderMaterial with UV distortion based on distance from center
+2. Read App.tsx: find how player state tracks upgrade levels (massLevel, speedLevel or similar)
 
-3. lensMat ShaderMaterial uniforms: { time, playerRadius, distortionStrength }
-   - vertexShader: passthrough with vUv varying
-   - fragmentShader:
-     * dist = length(vUv - 0.5) * 2.0 (0 at center, 1 at edge)
-     * UV offset = normalize(vUv - 0.5) * pow(1.0 - dist, 2.0) * distortionStrength
-     * Alpha = 0.05-0.1 (subtle effect), color = faint white/blue
+3. Read SaveManager.ts: check if upgrade levels are persisted
 
-4. Add LENS_DISTORTION_STRENGTH = 0.15 to constants.ts
+4. Add max-level tracking:
+   - Define MAX_UPGRADE_LEVEL = 5 for both mass and speed
+   - Track current upgrade level for each in player state
+   - Persist upgrade levels in SaveManager (add massLevel, speedLevel fields)
+   - Load saved levels on game start
 
-5. In animation loop, update lensMat.uniforms.playerRadius.value from playerRef.current.radius
+5. Add golden celebration when upgrade reaches max:
+   - In Scene.tsx, check if upgrade purchase brings level to MAX_UPGRADE_LEVEL
+   - If so, call createGoldenBurst() at player position
+   - Set growthFlash = 1.0 on player for extra glow
+   - Play success haptic: Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success)
 
-6. Position lensSphere at player mesh position every frame
+6. Add visual indicator in UI for maxed upgrades:
+   - When massLevel or speedLevel === MAX_UPGRADE_LEVEL, add golden border/glow to that upgrade button
+   - Show "MAX" badge or "★ MASTERED ★" text on the button
 
-7. Run: cd BlackHoleSimulator && npx expo export --platform android 2>&1 | tail -20
+7. Run: cd BlackHoleSimulator && npx expo export --platform android 2>&1 | tail -10
 
-keywords: gravitational-lens, distortion, event-horizon, shader
+OUTPUT: commit hash + brief description of changes
+keywords: golden-glow,maxed-upgrade,celebration,mastered,upgrade-level
 ULW

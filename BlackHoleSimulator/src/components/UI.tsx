@@ -37,6 +37,8 @@ interface UIProps {
   isPaused?: boolean;
   onPause?: () => void;
   onUpgradePurchase?: (type: 'mass' | 'speed', amount: number) => void;
+  massLevel?: number;
+  speedLevel?: number;
 }
 
 export default function UI({
@@ -68,7 +70,10 @@ export default function UI({
   isPaused = false,
   onPause,
   onUpgradePurchase,
+  massLevel = 0,
+  speedLevel = 0,
 }: UIProps) {
+  const MAX_UPGRADE_LEVEL = 5;
   const [showPayModal, setShowPayModal] = useState(false);
   const [showStatsModal, setShowStatsModal] = useState(false);
   const [localSpeed, setLocalSpeed] = useState(simSpeed);
@@ -234,35 +239,53 @@ export default function UI({
           {/* Mass Upgrade Button */}
           <View style={styles.upgradeRow}>
             <TouchableOpacity
-              style={styles.upgradeBtn}
+              style={[
+                styles.upgradeBtn,
+                massLevel >= MAX_UPGRADE_LEVEL && styles.upgradeBtnMaxed,
+              ]}
               onPress={() => {
-                if (onUpgradePurchase) {
+                if (onUpgradePurchase && massLevel < MAX_UPGRADE_LEVEL) {
                   onUpgradePurchase('mass', 100);
                   (window as any).__purchaseUpgrade?.('mass', 100);
                 }
               }}
+              disabled={massLevel >= MAX_UPGRADE_LEVEL}
             >
               <Text style={styles.upgradeIcon}>📦</Text>
               <View>
                 <Text style={styles.upgradeZh}>增加質量</Text>
                 <Text style={styles.upgradeEn}>+100 MASS</Text>
               </View>
+              {massLevel >= MAX_UPGRADE_LEVEL && (
+                <View style={styles.maxBadge}>
+                  <Text style={styles.maxBadgeText}>MAX</Text>
+                </View>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.upgradeBtnSpeed}
+              style={[
+                styles.upgradeBtnSpeed,
+                speedLevel >= MAX_UPGRADE_LEVEL && styles.upgradeBtnSpeedMaxed,
+              ]}
               onPress={() => {
-                if (onUpgradePurchase) {
+                if (onUpgradePurchase && speedLevel < MAX_UPGRADE_LEVEL) {
                   onUpgradePurchase('speed', 2);
                   (window as any).__purchaseUpgrade?.('speed', 2);
                 }
               }}
+              disabled={speedLevel >= MAX_UPGRADE_LEVEL}
             >
               <Text style={styles.upgradeIcon}>⚡</Text>
               <View>
                 <Text style={styles.upgradeZh}>增加速度</Text>
                 <Text style={styles.upgradeEn}>+2x SPEED</Text>
               </View>
+              {speedLevel >= MAX_UPGRADE_LEVEL && (
+                <View style={styles.maxBadgeSpeed}>
+                  <Text style={styles.maxBadgeTextSpeed}>MAX</Text>
+                </View>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -662,6 +685,46 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,180,0,0.3)',
     borderRadius: 12,
+  },
+  upgradeBtnMaxed: {
+    backgroundColor: 'rgba(80,60,0,0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,215,0,0.6)',
+  },
+  upgradeBtnSpeedMaxed: {
+    backgroundColor: 'rgba(60,50,0,0.92)',
+    borderWidth: 2,
+    borderColor: 'rgba(255,215,0,0.6)',
+  },
+  maxBadge: {
+    marginLeft: 'auto',
+    backgroundColor: 'rgba(255,215,0,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.5)',
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  maxBadgeText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffd700',
+    letterSpacing: 0.5,
+  },
+  maxBadgeSpeed: {
+    marginLeft: 'auto',
+    backgroundColor: 'rgba(255,215,0,0.25)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,215,0,0.5)',
+    borderRadius: 8,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+  },
+  maxBadgeTextSpeed: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: '#ffd700',
+    letterSpacing: 0.5,
   },
   upgradeIcon: {
     fontSize: 20,

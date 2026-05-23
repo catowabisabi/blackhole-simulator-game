@@ -42,6 +42,8 @@ export default function App() {
   const [hintText, setHintText] = useState('');
   const [showHint, setShowHint] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [massLevel, setMassLevel] = useState(0);
+  const [speedLevel, setSpeedLevel] = useState(0);
 
   const handlePause = useCallback(() => setIsPaused(true), []);
   const handleResume = useCallback(() => setIsPaused(false), []);
@@ -51,6 +53,8 @@ export default function App() {
     SaveManager.load().then((data) => {
       setHighScore(data.highScore);
       setGamesPlayed(data.gamesPlayed);
+      setMassLevel(data.massLevel);
+      setSpeedLevel(data.speedLevel);
       if (data.difficulty === 'easy' || data.difficulty === 'normal' || data.difficulty === 'hard') {
         setDifficulty(data.difficulty);
       }
@@ -259,6 +263,8 @@ export default function App() {
         onUpgradePurchase={(type: 'mass' | 'speed', amount: number) => {
           (window as any).__purchaseUpgrade?.(type, amount);
         }}
+        massLevel={massLevel}
+        speedLevel={speedLevel}
       />
       {gameState !== 'idle' && (
         <View style={[styles.overlay, { 
