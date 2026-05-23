@@ -1,8 +1,34 @@
-TASK: Implement point-of-no-return flash effect in Scene.tsx
+TASK: Implement gravitational lens distortion shader in Scene.tsx
 
-When a body is absorbed (distance < playerRadius), create a brief white flash sprite at that world position. The flash should scale up (1→3) and fade out (opacity 1→0) over 150ms. Add constants: POINT_OF_NO_RETURN_FLASH_DURATION=0.15, POINT_OF_NO_RETURN_FLASH_COLOR=0xffffff
+Concept #19: Render real-time UV distortion around player BH - objects and background warp near event horizon using shader displacement based on distance to BH center.
 
-Also add a hasTriggeredNoReturnFlash flag to Body class to prevent repeat triggers.
+CONTEXT:
+- Player BH is rendered as diskMesh with diskMat ShaderMaterial (line ~793 in Scene.tsx)
+- diskMat uniforms: { time, growthFlash }
+- diskMesh is a PlaneGeometry positioned at Y=0
 
-keywords: emergence, subscriber, fault-tolerance, zooming interface, games
+STEPS:
+1. Read BlackHoleSimulator/src/components/Scene.tsx lines 760-815 (diskMat shader) and lines 1300-1340 (player mesh setup)
+
+2. Create gravitational lens as a SPHERE mesh around the player BH:
+   - Create lensSphere: new THREE.Mesh(new THREE.SphereGeometry(playerRadius * 2, 32, 32), lensMat)
+   - Position at player position
+   - Use ShaderMaterial with UV distortion based on distance from center
+
+3. lensMat ShaderMaterial uniforms: { time, playerRadius, distortionStrength }
+   - vertexShader: passthrough with vUv varying
+   - fragmentShader:
+     * dist = length(vUv - 0.5) * 2.0 (0 at center, 1 at edge)
+     * UV offset = normalize(vUv - 0.5) * pow(1.0 - dist, 2.0) * distortionStrength
+     * Alpha = 0.05-0.1 (subtle effect), color = faint white/blue
+
+4. Add LENS_DISTORTION_STRENGTH = 0.15 to constants.ts
+
+5. In animation loop, update lensMat.uniforms.playerRadius.value from playerRef.current.radius
+
+6. Position lensSphere at player mesh position every frame
+
+7. Run: cd BlackHoleSimulator && npx expo export --platform android 2>&1 | tail -20
+
+keywords: gravitational-lens, distortion, event-horizon, shader
 ULW
